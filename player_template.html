@@ -1,0 +1,865 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Video Player with Sidebars</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/video.js/8.5.2/video-js.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/feather-icons/dist/feather.min.css" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/video.js/8.5.2/video.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@1.4.0/dist/hls.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/dashjs/dist/dash.all.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/feather-icons/dist/feather.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #111;
+            color: #fff;
+            overflow-x: hidden;
+        }
+
+        #player-container {
+            position: relative;
+            width: 100%;
+            height: 100vh;
+            display: flex;
+            transition: all 0.3s ease;
+        }
+
+        /* Video Player Styles */
+        #video-container {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            background: #000;
+            z-index: 1;
+            transition: filter 0.3s ease;
+        }
+
+        #video-player {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+        }
+
+        .dim-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            z-index: 998;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.3s ease, visibility 0.3s ease;
+        }
+
+        .dim-overlay.active {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        /* Sidebar Styles */
+        .sidebar {
+            position: fixed;
+            top: 0;
+            width: 320px;
+            height: 100%;
+            background: #1a1a1a;
+            z-index: 999;
+            transition: transform 0.3s ease;
+            overflow-y: auto;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+        }
+
+        #playlist-sidebar {
+            left: 0;
+            transform: translateX(-100%);
+        }
+
+        #settings-sidebar {
+            right: 0;
+            transform: translateX(100%);
+        }
+
+        .sidebar.active {
+            transform: translateX(0);
+        }
+
+        .sidebar-header {
+            padding: 20px;
+            border-bottom: 1px solid #333;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .sidebar-title {
+            font-size: 1.2rem;
+            font-weight: 600;
+        }
+
+        .close-sidebar {
+            background: none;
+            border: none;
+            color: #fff;
+            cursor: pointer;
+            font-size: 1.2rem;
+        }
+
+        .sidebar-content {
+            padding: 20px;
+        }
+
+        /* Playlist Styles */
+        .playlist-item {
+            display: flex;
+            padding: 12px;
+            border-bottom: 1px solid #2a2a2a;
+            cursor: pointer;
+            transition: background 0.2s ease;
+        }
+
+        .playlist-item:hover {
+            background: #2a2a2a;
+        }
+
+        .playlist-item.active {
+            background: #333;
+            border-left: 3px solid #ffcc00;
+        }
+
+        .playlist-thumb {
+            width: 80px;
+            height: 45px;
+            background: #333;
+            margin-right: 12px;
+            flex-shrink: 0;
+            background-size: cover;
+            background-position: center;
+        }
+
+        .playlist-info {
+            flex: 1;
+        }
+
+        .playlist-title {
+            font-size: 0.9rem;
+            margin-bottom: 4px;
+            line-height: 1.3;
+        }
+
+        .playlist-duration {
+            font-size: 0.8rem;
+            color: #aaa;
+        }
+
+        /* Settings Styles */
+        .settings-group {
+            margin-bottom: 25px;
+        }
+
+        .settings-title {
+            font-size: 1rem;
+            margin-bottom: 12px;
+            color: #ffcc00;
+            font-weight: 600;
+        }
+
+        .settings-option {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+
+        .settings-label {
+            font-size: 0.9rem;
+        }
+
+        .settings-control {
+            background: #333;
+            border: none;
+            color: #fff;
+            padding: 6px 12px;
+            border-radius: 4px;
+        }
+
+        /* Control Bar Styles */
+        #control-bar {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            background: linear-gradient(transparent, rgba(0, 0, 0, 0.8));
+            padding: 15px 20px;
+            display: flex;
+            align-items: center;
+            z-index: 10;
+        }
+
+        .control-btn {
+            background: none;
+            border: none;
+            color: #fff;
+            font-size: 1.2rem;
+            margin-right: 15px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            transition: background 0.2s ease;
+        }
+
+        .control-btn:hover {
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .progress-container {
+            flex: 1;
+            height: 5px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 3px;
+            margin: 0 15px;
+            cursor: pointer;
+            position: relative;
+        }
+
+        .progress-bar {
+            height: 100%;
+            background: #ffcc00;
+            border-radius: 3px;
+            width: 0%;
+        }
+
+        .time-display {
+            font-size: 0.9rem;
+            color: #fff;
+            min-width: 100px;
+            text-align: center;
+        }
+
+        /* Info Bar */
+        #info-bar {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            background: linear-gradient(rgba(0, 0, 0, 0.8), transparent);
+            padding: 15px 20px;
+            display: flex;
+            justify-content: space-between;
+            z-index: 10;
+        }
+
+        .video-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+        }
+
+        .video-meta {
+            font-size: 0.9rem;
+            color: #ccc;
+        }
+
+        /* Debug Console */
+        #debug-console {
+            position: fixed;
+            bottom: 10px;
+            right: 10px;
+            width: 300px;
+            height: 150px;
+            background: rgba(0, 0, 0, 0.8);
+            border: 1px solid #333;
+            padding: 10px;
+            font-size: 0.8rem;
+            overflow-y: auto;
+            z-index: 1000;
+            display: none;
+        }
+
+        #debug-console.active {
+            display: block;
+        }
+
+        /* Loading State */
+        .loading {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100%;
+            font-size: 1.1rem;
+            color: #ffcc00;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .sidebar {
+                width: 280px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .sidebar {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="player-container">
+        <!-- Dim Overlay -->
+        <div class="dim-overlay" id="dim-overlay"></div>
+        
+        <!-- Video Area -->
+        <div id="video-container">
+            <video id="video-player" class="video-js" controls preload="auto">
+                <p class="vjs-no-js">
+                    To view this video please enable JavaScript, and consider upgrading to a
+                    web browser that <a href="https://videojs.com/html5-video-support/" target="_blank">supports HTML5 video</a>
+                </p>
+            </video>
+            
+            <!-- Info Bar -->
+            <div id="info-bar">
+                <div class="video-title">Loading...</div>
+                <div class="video-meta">Please wait</div>
+            </div>
+            
+            <!-- Control Bar -->
+            <div id="control-bar">
+                <button class="control-btn" id="playlist-toggle">
+                    <i data-feather="list"></i>
+                </button>
+                <button class="control-btn" id="play-pause">
+                    <i data-feather="play"></i>
+                </button>
+                <button class="control-btn" id="mute-toggle">
+                    <i data-feather="volume-2"></i>
+                </button>
+                <div class="progress-container" id="progress-container">
+                    <div class="progress-bar" id="progress-bar"></div>
+                </div>
+                <div class="time-display" id="time-display">0:00 / 0:00</div>
+                <button class="control-btn" id="settings-toggle">
+                    <i data-feather="settings"></i>
+                </button>
+                <button class="control-btn" id="fullscreen-toggle">
+                    <i data-feather="maximize"></i>
+                </button>
+            </div>
+        </div>
+        
+        <!-- Playlist Sidebar -->
+        <div class="sidebar" id="playlist-sidebar">
+            <div class="sidebar-header">
+                <div class="sidebar-title">Playlist</div>
+                <button class="close-sidebar" id="close-playlist">
+                    <i data-feather="x"></i>
+                </button>
+            </div>
+            <div class="sidebar-content">
+                <div id="playlist-container">
+                    <div class="loading">Loading episodes...</div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Settings Sidebar -->
+        <div class="sidebar" id="settings-sidebar">
+            <div class="sidebar-header">
+                <div class="sidebar-title">Settings</div>
+                <button class="close-sidebar" id="close-settings">
+                    <i data-feather="x"></i>
+                </button>
+            </div>
+            <div class="sidebar-content">
+                <div class="settings-group">
+                    <div class="settings-title">Playback</div>
+                    <div class="settings-option">
+                        <span class="settings-label">Quality</span>
+                        <select class="settings-control" id="quality-select">
+                            <option value="auto">Auto</option>
+                            <option value="1080">1080p</option>
+                            <option value="720">720p</option>
+                            <option value="480">480p</option>
+                            <option value="360">360p</option>
+                        </select>
+                    </div>
+                    <div class="settings-option">
+                        <span class="settings-label">Speed</span>
+                        <select class="settings-control" id="speed-select">
+                            <option value="0.5">0.5x</option>
+                            <option value="0.75">0.75x</option>
+                            <option value="1" selected>1x</option>
+                            <option value="1.25">1.25x</option>
+                            <option value="1.5">1.5x</option>
+                            <option value="2">2x</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div class="settings-group">
+                    <div class="settings-title">Audio</div>
+                    <div class="settings-option">
+                        <span class="settings-label">Volume</span>
+                        <input type="range" class="settings-control" id="volume-slider" min="0" max="100" value="100">
+                    </div>
+                </div>
+                
+                <div class="settings-group">
+                    <div class="settings-title">Interface</div>
+                    <div class="settings-option">
+                        <span class="settings-label">Debug Console</span>
+                        <label class="switch">
+                            <input type="checkbox" id="debug-toggle">
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Debug Console -->
+        <div id="debug-console"></div>
+    </div>
+
+    <script>
+        // This placeholder will be replaced by the Python script
+        const EPISODES_PLACEHOLDER = '$$EPISODES_ARRAY_PLACEHOLDER$$';
+
+        // Player state
+        let playerState = {
+            currentEpisode: 0,
+            isPlaying: false,
+            isMuted: false,
+            volume: 1,
+            playbackRate: 1,
+            quality: 'auto',
+            favorites: [],
+            history: [],
+            debugMode: false
+        };
+
+        // DOM Elements
+        const videoPlayer = document.getElementById('video-player');
+        const playlistSidebar = document.getElementById('playlist-sidebar');
+        const settingsSidebar = document.getElementById('settings-sidebar');
+        const dimOverlay = document.getElementById('dim-overlay');
+        const playlistContainer = document.getElementById('playlist-container');
+        const debugConsole = document.getElementById('debug-console');
+        
+        // Control buttons
+        const playlistToggle = document.getElementById('playlist-toggle');
+        const settingsToggle = document.getElementById('settings-toggle');
+        const closePlaylist = document.getElementById('close-playlist');
+        const closeSettings = document.getElementById('close-settings');
+        const playPauseBtn = document.getElementById('play-pause');
+        const muteToggleBtn = document.getElementById('mute-toggle');
+        const fullscreenToggle = document.getElementById('fullscreen-toggle');
+        const progressContainer = document.getElementById('progress-container');
+        const progressBar = document.getElementById('progress-bar');
+        const timeDisplay = document.getElementById('time-display');
+        const debugToggle = document.getElementById('debug-toggle');
+        
+        // Settings controls
+        const qualitySelect = document.getElementById('quality-select');
+        const speedSelect = document.getElementById('speed-select');
+        const volumeSlider = document.getElementById('volume-slider');
+
+        // Initialize player
+        function initPlayer() {
+            // Check if episodes data is available
+            if (typeof episodes === 'undefined' || episodes.length === 0) {
+                console.error('No episodes data found');
+                document.querySelector('.video-title').textContent = 'No episodes available';
+                document.querySelector('.video-meta').textContent = 'Check your RSS feed';
+                playlistContainer.innerHTML = '<div class="loading">No episodes found in RSS feed</div>';
+                return;
+            }
+
+            // Initialize video.js player
+            const player = videojs('video-player', {
+                controls: false,
+                autoplay: false,
+                preload: 'auto',
+                responsive: true,
+                fluid: true
+            });
+
+            // Populate playlist
+            renderPlaylist();
+            
+            // Load first episode
+            if (episodes.length > 0) {
+                loadEpisode(0);
+            }
+            
+            // Initialize event listeners
+            initEventListeners();
+            
+            // Initialize icons
+            feather.replace();
+            
+            // Log initialization
+            logToConsole(`Player initialized with ${episodes.length} episodes`);
+        }
+
+        // Render playlist
+        function renderPlaylist() {
+            playlistContainer.innerHTML = '';
+            
+            episodes.forEach((episode, index) => {
+                const item = document.createElement('div');
+                item.className = 'playlist-item';
+                if (index === playerState.currentEpisode) {
+                    item.classList.add('active');
+                }
+                
+                // Use episode data structure from RSS feed
+                const title = episode.title || `Episode ${index + 1}`;
+                const size = episode.size || '';
+                const thumbnail = episode.thumbnail || `https://placehold.co/80x45/333/fff?text=${encodeURIComponent(title.substring(0, 10))}`;
+                
+                item.innerHTML = `
+                    <div class="playlist-thumb" style="background-image: url('${thumbnail}')"></div>
+                    <div class="playlist-info">
+                        <div class="playlist-title">${title}</div>
+                        <div class="playlist-duration">${size}</div>
+                    </div>
+                `;
+                
+                item.addEventListener('click', () => {
+                    loadEpisode(index);
+                    closeSidebars();
+                });
+                
+                playlistContainer.appendChild(item);
+            });
+        }
+
+        // Load episode
+        function loadEpisode(index) {
+            if (index < 0 || index >= episodes.length) return;
+            
+            const episode = episodes[index];
+            playerState.currentEpisode = index;
+            
+            // Update UI
+            document.querySelectorAll('.playlist-item').forEach((item, i) => {
+                if (i === index) {
+                    item.classList.add('active');
+                } else {
+                    item.classList.remove('active');
+                }
+            });
+            
+            // Update info bar
+            document.querySelector('.video-title').textContent = episode.title || `Episode ${index + 1}`;
+            document.querySelector('.video-meta').textContent = episode.size ? `Size: ${episode.size}` : `Season ${episode.season || 1}`;
+            
+            // Load video source
+            const player = videojs('video-player');
+            
+            // Clear previous sources
+            player.src('');
+            
+            // Determine best source - use file URL from RSS feed
+            let source = {};
+            const fileUrl = episode.file;
+            
+            if (!fileUrl) {
+                logToConsole('No video file URL found for this episode');
+                return;
+            }
+            
+            // Detect source type by extension
+            if (fileUrl.includes('.m3u8')) {
+                source = {
+                    src: fileUrl,
+                    type: 'application/x-mpegURL'
+                };
+            } else if (fileUrl.includes('.mpd')) {
+                source = {
+                    src: fileUrl,
+                    type: 'application/dash+xml'
+                };
+            } else if (fileUrl.includes('.mp4')) {
+                source = {
+                    src: fileUrl,
+                    type: 'video/mp4'
+                };
+            } else {
+                // Default to MP4 if we can't determine
+                source = {
+                    src: fileUrl,
+                    type: 'video/mp4'
+                };
+            }
+            
+            player.src(source);
+            player.load();
+            
+            // Add to history
+            addToHistory(episode.id || index);
+            
+            // Log episode load
+            logToConsole(`Loaded episode: ${episode.title || `Episode ${index + 1}`}`);
+        }
+
+        // Initialize event listeners
+        function initEventListeners() {
+            // Sidebar toggles
+            playlistToggle.addEventListener('click', () => toggleSidebar('playlist'));
+            settingsToggle.addEventListener('click', () => toggleSidebar('settings'));
+            closePlaylist.addEventListener('click', () => closeSidebars());
+            closeSettings.addEventListener('click', () => closeSidebars());
+            dimOverlay.addEventListener('click', () => closeSidebars());
+            
+            // Play/Pause
+            playPauseBtn.addEventListener('click', togglePlayPause);
+            
+            // Mute/Unmute
+            muteToggleBtn.addEventListener('click', toggleMute);
+            
+            // Fullscreen
+            fullscreenToggle.addEventListener('click', toggleFullscreen);
+            
+            // Progress bar
+            progressContainer.addEventListener('click', seekVideo);
+            
+            // Settings controls
+            qualitySelect.addEventListener('change', (e) => {
+                playerState.quality = e.target.value;
+                logToConsole(`Quality changed to: ${e.target.value}`);
+            });
+            
+            speedSelect.addEventListener('change', (e) => {
+                const speed = parseFloat(e.target.value);
+                playerState.playbackRate = speed;
+                videojs('video-player').playbackRate(speed);
+                logToConsole(`Playback speed changed to: ${speed}x`);
+            });
+            
+            volumeSlider.addEventListener('input', (e) => {
+                const volume = e.target.value / 100;
+                playerState.volume = volume;
+                videojs('video-player').volume(volume);
+                
+                // Update mute button if needed
+                if (volume === 0 && !playerState.isMuted) {
+                    toggleMute();
+                } else if (volume > 0 && playerState.isMuted) {
+                    toggleMute();
+                }
+                
+                logToConsole(`Volume changed to: ${Math.round(volume * 100)}%`);
+            });
+            
+            // Debug toggle
+            debugToggle.addEventListener('change', (e) => {
+                playerState.debugMode = e.target.checked;
+                debugConsole.classList.toggle('active', e.target.checked);
+                logToConsole(`Debug mode ${e.target.checked ? 'enabled' : 'disabled'}`);
+            });
+            
+            // Video events
+            const player = videojs('video-player');
+            
+            player.on('play', () => {
+                playerState.isPlaying = true;
+                updatePlayPauseButton();
+                logToConsole('Video playing');
+            });
+            
+            player.on('pause', () => {
+                playerState.isPlaying = false;
+                updatePlayPauseButton();
+                logToConsole('Video paused');
+            });
+            
+            player.on('timeupdate', updateProgress);
+            
+            player.on('loadedmetadata', () => {
+                updateProgress();
+                logToConsole('Video metadata loaded');
+            });
+            
+            player.on('volumechange', () => {
+                const currentVolume = player.volume();
+                if (currentVolume !== playerState.volume) {
+                    playerState.volume = currentVolume;
+                    volumeSlider.value = currentVolume * 100;
+                    updateMuteButton();
+                }
+            });
+            
+            // Prevent default touch behaviors for Weebly compatibility
+            document.addEventListener('touchstart', handleTouch, { passive: false });
+            document.addEventListener('touchmove', handleTouch, { passive: false });
+        }
+
+        // Toggle sidebar
+        function toggleSidebar(sidebar) {
+            const isPlaylist = sidebar === 'playlist';
+            const targetSidebar = isPlaylist ? playlistSidebar : settingsSidebar;
+            const otherSidebar = isPlaylist ? settingsSidebar : playlistSidebar;
+            
+            if (targetSidebar.classList.contains('active')) {
+                closeSidebars();
+            } else {
+                // Close other sidebar first
+                otherSidebar.classList.remove('active');
+                // Open target sidebar
+                targetSidebar.classList.add('active');
+                dimOverlay.classList.add('active');
+            }
+        }
+
+        // Close all sidebars
+        function closeSidebars() {
+            playlistSidebar.classList.remove('active');
+            settingsSidebar.classList.remove('active');
+            dimOverlay.classList.remove('active');
+        }
+
+        // Toggle play/pause
+        function togglePlayPause() {
+            const player = videojs('video-player');
+            if (playerState.isPlaying) {
+                player.pause();
+            } else {
+                player.play();
+            }
+        }
+
+        // Update play/pause button
+        function updatePlayPauseButton() {
+            const icon = playPauseBtn.querySelector('i');
+            if (playerState.isPlaying) {
+                icon.setAttribute('data-feather', 'pause');
+            } else {
+                icon.setAttribute('data-feather', 'play');
+            }
+            feather.replace();
+        }
+
+        // Toggle mute
+        function toggleMute() {
+            const player = videojs('video-player');
+            playerState.isMuted = !playerState.isMuted;
+            player.muted(playerState.isMuted);
+            updateMuteButton();
+            
+            logToConsole(`Audio ${playerState.isMuted ? 'muted' : 'unmuted'}`);
+        }
+
+        // Update mute button
+        function updateMuteButton() {
+            const icon = muteToggleBtn.querySelector('i');
+            const player = videojs('video-player');
+            
+            if (player.muted() || player.volume() === 0) {
+                icon.setAttribute('data-feather', 'volume-x');
+            } else if (player.volume() < 0.5) {
+                icon.setAttribute('data-feather', 'volume-1');
+            } else {
+                icon.setAttribute('data-feather', 'volume-2');
+            }
+            
+            feather.replace();
+        }
+
+        // Toggle fullscreen
+        function toggleFullscreen() {
+            if (!document.fullscreenElement) {
+                document.documentElement.requestFullscreen().catch(err => {
+                    logToConsole(`Error attempting to enable fullscreen: ${err.message}`);
+                });
+            } else {
+                if (document.exitFullscreen) {
+                    document.exitFullscreen();
+                }
+            }
+        }
+
+        // Update progress bar
+        function updateProgress() {
+            const player = videojs('video-player');
+            const currentTime = player.currentTime();
+            const duration = player.duration();
+            
+            if (duration > 0) {
+                const progressPercent = (currentTime / duration) * 100;
+                progressBar.style.width = `${progressPercent}%`;
+                
+                // Update time display
+                const currentTimeFormatted = formatTime(currentTime);
+                const durationFormatted = formatTime(duration);
+                timeDisplay.textContent = `${currentTimeFormatted} / ${durationFormatted}`;
+            }
+        }
+
+        // Seek video
+        function seekVideo(e) {
+            const player = videojs('video-player');
+            const progressContainerRect = progressContainer.getBoundingClientRect();
+            const clickPosition = (e.clientX - progressContainerRect.left) / progressContainerRect.width;
+            const seekTime = clickPosition * player.duration();
+            
+            player.currentTime(seekTime);
+        }
+
+        // Format time (seconds to MM:SS)
+        function formatTime(seconds) {
+            const mins = Math.floor(seconds / 60);
+            const secs = Math.floor(seconds % 60);
+            return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
+        }
+
+        // Add to history
+        function addToHistory(episodeId) {
+            // Avoid duplicates
+            playerState.history = playerState.history.filter(id => id !== episodeId);
+            playerState.history.unshift(episodeId);
+            
+            // Keep only last 10 items
+            if (playerState.history.length > 10) {
+                playerState.history.pop();
+            }
+            
+            logToConsole(`Added episode ${episodeId} to history`);
+        }
+
+        // Log to debug console
+        function logToConsole(message) {
+            if (playerState.debugMode) {
+                const timestamp = new Date().toLocaleTimeString();
+                debugConsole.innerHTML += `[${timestamp}] ${message}<br>`;
+                debugConsole.scrollTop = debugConsole.scrollHeight;
+            }
+        }
+
+        // Handle touch events for Weebly compatibility
+        function handleTouch(e) {
+            // Prevent default only for specific elements to avoid interference
+            if (e.target.closest('.sidebar') || e.target.closest('#control-bar')) {
+                e.preventDefault();
+            }
+        }
+
+        // Initialize when DOM is loaded
+        document.addEventListener('DOMContentLoaded', initPlayer);
+    </script>
+</body>
+</html>
