@@ -1,9 +1,10 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1.0" />
-    <title>24 hour scheduled Liberty Player</title>
+    <title>Librv Player – Reusable Playlist TV Player</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
     <style>
@@ -108,13 +109,6 @@
             font-size: 14px;
             flex-grow: 1;
         }
-        .thumbnail-img {
-            width: 40px;
-            height: 40px;
-            border-radius: 4px;
-            margin-right: 8px;
-            object-fit: cover;
-        }
         #now-playing-banner {
             background-color: rgba(0, 0, 0, 0.7);
             color: white;
@@ -208,16 +202,43 @@
             font-weight: 600;
             flex: 2;
         }
+        .librv-note {
+            text-align: center;
+            font-size: 12px;
+            color: #888;
+            margin-top: 8px;
+        }
+        .mobile-schedule-toggle {
+            display: none;
+            background-color: var(--blue-accent);
+            color: white;
+            border: none;
+            border-radius: 9999px;
+            padding: 8px 16px;
+            font-weight: bold;
+            margin-bottom: 10px;
+            cursor: pointer;
+        }
+        @media (max-width: 1023px) {
+            .mobile-schedule-toggle {
+                display: block;
+            }
+            .schedule-grid.mobile-visible {
+                display: block !important;
+            }
+            .schedule-grid:not(.mobile-visible) {
+                display: none;
+            }
+        }
     </style>
 </head>
 <body>
 <div class="player-wrapper">
     <div class="space-y-4">
         <h1 class="text-2xl font-extrabold text-blue-accent mb-3">
-           Todays schedule
+            📺 Librv Player 
         </h1>
         <div id="tv-player-container">
-            <!-- FIX #1: removed crossorigin -->
             <video id="video-player" autoplay muted playsinline controls preload="auto"></video>
             <div id="fullscreen-overlay">
                 <div id="fullscreen-title">Now Playing</div>
@@ -230,11 +251,11 @@
             <div class="player-overlay flex justify-between">
                 <div class="self-start space-y-2 pointer-events-none">
                     <div class="flex items-center space-x-2 pointer-events-auto">
-                        <div id="channel-id" class="info-bubble text-white text-lg">CONTINUOUS</div>
-                        <div id="channel-name" class="info-bubble text-sm">Real‑duration playlist</div>
+                        <div id="channel-id" class="info-bubble text-white text-lg">LIBRV</div>
+                        <div id="channel-name" class="info-bubble text-sm">scheduled</div>
                     </div>
                     <div id="now-playing-banner">
-                        Now Playing: <span id="current-show">Loading schedule...</span>
+                        Now Playing: <span id="current-show">Loading menu...</span>
                     </div>
                 </div>
                 <div class="self-start text-right space-y-2 pointer-events-none">
@@ -253,150 +274,2612 @@
                 <button id="stop-btn" class="info-bubble !bg-red-700 !text-white !border-red-700 hover:!bg-red-600" onclick="stopPlayback()">Stop</button>
                 <button id="refresh-btn" class="info-bubble !bg-gray-700 !text-white !border-gray-700 hover:!bg-gray-600" onclick="location.reload()">Re‑Sync</button>
                 <button id="fullscreen-btn" class="info-bubble !bg-blue-accent !text-white !border-blue-accent hover:brightness-110" onclick="toggleFullscreen()">⛶ Fullscreen</button>
+                <button id="mobile-schedule-btn" class="mobile-schedule-toggle info-bubble !bg-blue-accent !text-white" onclick="toggleMobileSchedule()">📋 Schedule</button>
             </div>
         </div>
+        <div class="librv-note">
+            💡 Hover the video area (desktop) to see the full 24‑hour schedule sidebar. Click any item to jump.
+        </div>
     </div>
-    <div class="schedule-grid">
-        <h3 class="text-xl font-bold text-blue-accent mb-3 border-b border-gray-700 pb-2">24‑Hour Schedule (based on actual durations)</h3>
+    <div class="schedule-grid" id="schedule-grid">
+        <h3 class="text-xl font-bold text-blue-accent mb-3 border-b border-gray-700 pb-2">24‑Hour Schedule</h3>
         <div id="schedule-list"><div class="text-gray-500 text-sm p-4">Generating schedule...</div></div>
     </div>
 </div>
 
 <script>
-    // ---------- PLAYLIST with actual durations (seconds) ----------
-    // Replace with your own videos and exact durations for perfect timing.
+    // =========================================================================
+    // PLAYLIST DATA – AUTOMATICALLY INGESTED
+    // =========================================================================
     const playlist = [
-        { title: "Big Western Tv 379", url: "https://archive.org/download/bat-masterson-s-02-e-07-dead-men-dont-pay-debts/Bat%20Masterson%20S01E31%20Promised%20Land%201.ia.mp4", duration: 1560 },
-        { title: "Petticoat Junction S04E10 - Twenty-Five Years Too Late", url: "https://archive.org/download/Petticoat_Junction_Series/Petticoat%20Junction%20-%20Season%204/Petticoat%20Junction%20-%204x10%20-%20Twenty-Five%20Years%20Too%20Late.mp4", duration: 1500 },
-        { title: "Hogan's Heroes S03E06 Casanova Klink", url: "https://archive.org/download/hogans-heroes-s-01-e-01-the-informer_202509/Hogan%27s%20Heroes_S03E06_Casanova%20Klink.mp4", duration: 1500 },
-        { title: "Big Western Tv 1368", url: "https://archive.org/download/gunsmoke-s-16-e-01-the-noose/Gunsmoke%20S17E24%20(The%20Wedding).ia.mp4", duration: 1500 },
-        { title: "Petticoat Junction S02E35 - The Hairbrained Scheme", url: "https://archive.org/download/Petticoat_Junction_Series/Petticoat%20Junction%20-%20Season%202/Petticoat%20Junction%20-%202x35%20-%20The%20Hairbrained%20Scheme.mp4", duration: 1500 },
-        { title: "Big Western Tv 783", url: "https://archive.org/download/wagon-train-s-01-e-101-ep-101-the-willy-moran-story/Wagon%20Train_S01E137_Ep%20137%20-%20The%20John%20Wilbot%20Story.ia.mp4", duration: 1500 },
-        { title: "Big Western Tv 23", url: "https://archive.org/download/s-01.-e-17-ella-west.ia/S01.E24%20Girl%20From%20Piccadilly.ia.mp4", duration: 1500 },
-        { title: "Big Western Tv 318", url: "https://archive.org/download/s-01e-02.-point-blank/Maverick%20S05e10%20-%20Marshall%20Maverick.mp4", duration: 1500 },
-        { title: "S03E01", url: "https://archive.org/download/courage-the-cowardly-dog-1080p-ai-upscale/Courage%20the%20Cowardly%20Dog%20-%20S03E01.mp4", duration: 1320 },
-        { title: "Big Western Tv 683", url: "https://archive.org/download/tales-of-wells-fargo-s-06-e-30-royal-maroon/Tales%20of%20Wells%20Fargo%20S04E18%20The%20Easterner.ia.mp4", duration: 1500 },
-        { title: "Hogan's Heroes S03E28 The Collector General", url: "https://archive.org/download/hogans-heroes-s-01-e-01-the-informer_202509/Hogan%27s%20Heroes_S03E28_The%20Collector%20General.mp4", duration: 1500 },
-        { title: "Ancient Aliens S01E05 - The Return", url: "https://archive.org/download/ancientalienscollection/S01E05%20-%20The%20Return.mkv", duration: 2520 },
-        { title: "Big Western Tv 1575", url: "https://archive.org/download/lawman-s-03-e-24-detweilers-kid/Lawman%20S04E08%20The%20Catalog%20Woman%201.ia.mp4", duration: 1500 },
-        { title: "Big Western Tv 183", url: "https://archive.org/download/s-01.-e-17-ella-west.ia/S05E30%20Hobson's%20Choice.ia.mp4", duration: 1500 },
-        { title: "Ancient Aliens S12E01 - The Alien Hunters", url: "https://archive.org/download/ancientalienscollection/Ancient.Aliens.S12E01.The.Alien.Hunters.1080p.Hulu.WEB-DL.AAC2.0.H.264-QOQ.mkv", duration: 2520 },
-        { title: "Big Western Tv 863", url: "https://archive.org/download/wagon-train-s-01-e-101-ep-101-the-willy-moran-story/Wagon%20Train_S04E03_The%20Albert%20Farnsworth%20Story%201.ia.mp4", duration: 1500 },
-        { title: "Ancient Aliens S19E04", url: "https://archive.org/download/09.-most-beautiful-soft-rock-love-songs-80s-90s-soft-rock-ballads-70s-80s-90s-ol/Ancient%20Aliens%20Season%2019%201080p%20WEBRip%20x265%20An0mal1/Ancient.Aliens.S19E04.1080p.WEBRip.x265-An0mal1.mkv", duration: 2520 },
-        { title: "Big Western Tv 1587", url: "https://archive.org/download/lawman-s-03-e-24-detweilers-kid/Lawman%20S04E39%20Jailbreak%201.ia.mp4", duration: 1500 },
-        { title: "Big Western Tv 371", url: "https://archive.org/download/bat-masterson-s-02-e-07-dead-men-dont-pay-debts/Bat%20Masterson%20S01E23%20The%20Tumbleweed%20Wagon%201.ia.mp4", duration: 1500 },
-        { title: "Big Western Tv 1058", url: "https://archive.org/download/branded-s-02-e-22-barbed-wire_202405/Branded%20S01E16%20Price%20of%20a%20Name.mp4", duration: 1500 },
-        { title: "Big Western Tv 1279", url: "https://archive.org/download/naked-city-s-01-e-01-meridian/Naked%20City%20S04E19%20Beyond%20This%20Place%20There%20Be%20Dragons.mp4", duration: 1500 },
-        { title: "S01E12 - Shirley the Medium", url: "https://archive.org/download/courage-the-cowardly-dog-1080p-ai-upscale/Courage%20the%20Cowardly%20Dog%20-%2001x12%20-%20Shirley%20the%20Medium.mp4", duration: 1320 },
-        { title: "Big Western Tv 705", url: "https://archive.org/download/tales-of-wells-fargo-s-06-e-30-royal-maroon/Tales%20of%20Wells%20Fargo%20S05E03%20Doc%20Dawson.ia.mp4", duration: 1500 },
-        { title: "S01E08 - Freaky Fred", url: "https://archive.org/download/courage-the-cowardly-dog-1080p-ai-upscale/Courage%20the%20Cowardly%20Dog%20-%2001x08%20-%20Freaky%20Fred.mp4", duration: 1320 }
-    ];
+        {
+                "title": "The Faulkner Focus [2026-06-09 15:00] 00:05",
+                "file": "https://archive.org/download/FOXNEWSW_20260609_150000_The_Faulkner_Focus/FOXNEWSW_20260609_150000_The_Faulkner_Focus.mp4?exact=1&start=300&end=600",
+                "duration": 300
+        },
+        {
+                "title": "The Faulkner Focus [2026-06-09 15:00] 00:10",
+                "file": "https://archive.org/download/FOXNEWSW_20260609_150000_The_Faulkner_Focus/FOXNEWSW_20260609_150000_The_Faulkner_Focus.mp4?exact=1&start=600&end=900",
+                "duration": 300
+        },
+        {
+                "title": "The Faulkner Focus [2026-06-09 15:00] 00:15",
+                "file": "https://archive.org/download/FOXNEWSW_20260609_150000_The_Faulkner_Focus/FOXNEWSW_20260609_150000_The_Faulkner_Focus.mp4?exact=1&start=900&end=1200",
+                "duration": 300
+        },
+        {
+                "title": "The Faulkner Focus [2026-06-09 15:00] 00:20",
+                "file": "https://archive.org/download/FOXNEWSW_20260609_150000_The_Faulkner_Focus/FOXNEWSW_20260609_150000_The_Faulkner_Focus.mp4?exact=1&start=1200&end=1500",
+                "duration": 300
+        },
+        {
+                "title": "The Faulkner Focus [2026-06-09 15:00] 00:25",
+                "file": "https://archive.org/download/FOXNEWSW_20260609_150000_The_Faulkner_Focus/FOXNEWSW_20260609_150000_The_Faulkner_Focus.mp4?exact=1&start=1500&end=1800",
+                "duration": 300
+        },
+        {
+                "title": "The Faulkner Focus [2026-06-09 15:00] 00:30",
+                "file": "https://archive.org/download/FOXNEWSW_20260609_150000_The_Faulkner_Focus/FOXNEWSW_20260609_150000_The_Faulkner_Focus.mp4?exact=1&start=1800&end=2100",
+                "duration": 300
+        },
+        {
+                "title": "The Faulkner Focus [2026-06-09 15:00] 00:35",
+                "file": "https://archive.org/download/FOXNEWSW_20260609_150000_The_Faulkner_Focus/FOXNEWSW_20260609_150000_The_Faulkner_Focus.mp4?exact=1&start=2100&end=2400",
+                "duration": 300
+        },
+        {
+                "title": "The Faulkner Focus [2026-06-09 15:00] 00:40",
+                "file": "https://archive.org/download/FOXNEWSW_20260609_150000_The_Faulkner_Focus/FOXNEWSW_20260609_150000_The_Faulkner_Focus.mp4?exact=1&start=2400&end=2700",
+                "duration": 300
+        },
+        {
+                "title": "The Faulkner Focus [2026-06-09 15:00] 00:45",
+                "file": "https://archive.org/download/FOXNEWSW_20260609_150000_The_Faulkner_Focus/FOXNEWSW_20260609_150000_The_Faulkner_Focus.mp4?exact=1&start=2700&end=3000",
+                "duration": 300
+        },
+        {
+                "title": "The Faulkner Focus [2026-06-09 15:00] 00:50",
+                "file": "https://archive.org/download/FOXNEWSW_20260609_150000_The_Faulkner_Focus/FOXNEWSW_20260609_150000_The_Faulkner_Focus.mp4?exact=1&start=3000&end=3300",
+                "duration": 300
+        },
+        {
+                "title": "The Faulkner Focus [2026-06-09 15:00] 00:55",
+                "file": "https://archive.org/download/FOXNEWSW_20260609_150000_The_Faulkner_Focus/FOXNEWSW_20260609_150000_The_Faulkner_Focus.mp4?exact=1&start=3300&end=3600",
+                "duration": 300
+        },
+        {
+                "title": "Americas Newsroom [2026-06-09 14:00] 00:00",
+                "file": "https://archive.org/download/FOXNEWSW_20260609_140000_Americas_Newsroom/FOXNEWSW_20260609_140000_Americas_Newsroom.mp4?exact=1&start=0&end=300",
+                "duration": 300
+        },
+        {
+                "title": "Americas Newsroom [2026-06-09 14:00] 00:05",
+                "file": "https://archive.org/download/FOXNEWSW_20260609_140000_Americas_Newsroom/FOXNEWSW_20260609_140000_Americas_Newsroom.mp4?exact=1&start=300&end=600",
+                "duration": 300
+        },
+        {
+                "title": "Americas Newsroom [2026-06-09 14:00] 00:10",
+                "file": "https://archive.org/download/FOXNEWSW_20260609_140000_Americas_Newsroom/FOXNEWSW_20260609_140000_Americas_Newsroom.mp4?exact=1&start=600&end=900",
+                "duration": 300
+        },
+        {
+                "title": "Americas Newsroom [2026-06-09 14:00] 00:15",
+                "file": "https://archive.org/download/FOXNEWSW_20260609_140000_Americas_Newsroom/FOXNEWSW_20260609_140000_Americas_Newsroom.mp4?exact=1&start=900&end=1200",
+                "duration": 300
+        },
+        {
+                "title": "Americas Newsroom [2026-06-09 14:00] 00:20",
+                "file": "https://archive.org/download/FOXNEWSW_20260609_140000_Americas_Newsroom/FOXNEWSW_20260609_140000_Americas_Newsroom.mp4?exact=1&start=1200&end=1500",
+                "duration": 300
+        },
+        {
+                "title": "Americas Newsroom [2026-06-09 14:00] 00:25",
+                "file": "https://archive.org/download/FOXNEWSW_20260609_140000_Americas_Newsroom/FOXNEWSW_20260609_140000_Americas_Newsroom.mp4?exact=1&start=1500&end=1800",
+                "duration": 300
+        },
+        {
+                "title": "Americas Newsroom [2026-06-09 14:00] 00:30",
+                "file": "https://archive.org/download/FOXNEWSW_20260609_140000_Americas_Newsroom/FOXNEWSW_20260609_140000_Americas_Newsroom.mp4?exact=1&start=1800&end=2100",
+                "duration": 300
+        },
+        {
+                "title": "Americas Newsroom [2026-06-09 14:00] 00:35",
+                "file": "https://archive.org/download/FOXNEWSW_20260609_140000_Americas_Newsroom/FOXNEWSW_20260609_140000_Americas_Newsroom.mp4?exact=1&start=2100&end=2400",
+                "duration": 300
+        },
+        {
+                "title": "Americas Newsroom [2026-06-09 14:00] 00:40",
+                "file": "https://archive.org/download/FOXNEWSW_20260609_140000_Americas_Newsroom/FOXNEWSW_20260609_140000_Americas_Newsroom.mp4?exact=1&start=2400&end=2700",
+                "duration": 300
+        },
+        {
+                "title": "Americas Newsroom [2026-06-09 14:00] 00:45",
+                "file": "https://archive.org/download/FOXNEWSW_20260609_140000_Americas_Newsroom/FOXNEWSW_20260609_140000_Americas_Newsroom.mp4?exact=1&start=2700&end=3000",
+                "duration": 300
+        },
+        {
+                "title": "Americas Newsroom [2026-06-09 14:00] 00:50",
+                "file": "https://archive.org/download/FOXNEWSW_20260609_140000_Americas_Newsroom/FOXNEWSW_20260609_140000_Americas_Newsroom.mp4?exact=1&start=3000&end=3300",
+                "duration": 300
+        },
+        {
+                "title": "Americas Newsroom [2026-06-09 14:00] 00:55",
+                "file": "https://archive.org/download/FOXNEWSW_20260609_140000_Americas_Newsroom/FOXNEWSW_20260609_140000_Americas_Newsroom.mp4?exact=1&start=3300&end=3600",
+                "duration": 300
+        },
+        {
+                "title": "Americas Newsroom [2026-06-09 13:00] 00:00",
+                "file": "https://archive.org/download/FOXNEWSW_20260609_130000_Americas_Newsroom/FOXNEWSW_20260609_130000_Americas_Newsroom.mp4?exact=1&start=0&end=300",
+                "duration": 300
+        },
+        {
+                "title": "Americas Newsroom [2026-06-09 13:00] 00:05",
+                "file": "https://archive.org/download/FOXNEWSW_20260609_130000_Americas_Newsroom/FOXNEWSW_20260609_130000_Americas_Newsroom.mp4?exact=1&start=300&end=600",
+                "duration": 300
+        },
+        {
+                "title": "Americas Newsroom [2026-06-09 13:00] 00:10",
+                "file": "https://archive.org/download/FOXNEWSW_20260609_130000_Americas_Newsroom/FOXNEWSW_20260609_130000_Americas_Newsroom.mp4?exact=1&start=600&end=900",
+                "duration": 300
+        },
+        {
+                "title": "Americas Newsroom [2026-06-09 13:00] 00:15",
+                "file": "https://archive.org/download/FOXNEWSW_20260609_130000_Americas_Newsroom/FOXNEWSW_20260609_130000_Americas_Newsroom.mp4?exact=1&start=900&end=1200",
+                "duration": 300
+        },
+        {
+                "title": "Americas Newsroom [2026-06-09 13:00] 00:20",
+                "file": "https://archive.org/download/FOXNEWSW_20260609_130000_Americas_Newsroom/FOXNEWSW_20260609_130000_Americas_Newsroom.mp4?exact=1&start=1200&end=1500",
+                "duration": 300
+        },
+        {
+                "title": "Americas Newsroom [2026-06-09 13:00] 00:25",
+                "file": "https://archive.org/download/FOXNEWSW_20260609_130000_Americas_Newsroom/FOXNEWSW_20260609_130000_Americas_Newsroom.mp4?exact=1&start=1500&end=1800",
+                "duration": 300
+        },
+        {
+                "title": "Americas Newsroom [2026-06-09 13:00] 00:30",
+                "file": "https://archive.org/download/FOXNEWSW_20260609_130000_Americas_Newsroom/FOXNEWSW_20260609_130000_Americas_Newsroom.mp4?exact=1&start=1800&end=2100",
+                "duration": 300
+        },
+        {
+                "title": "Americas Newsroom [2026-06-09 13:00] 00:35",
+                "file": "https://archive.org/download/FOXNEWSW_20260609_130000_Americas_Newsroom/FOXNEWSW_20260609_130000_Americas_Newsroom.mp4?exact=1&start=2100&end=2400",
+                "duration": 300
+        },
+        {
+                "title": "Americas Newsroom [2026-06-09 13:00] 00:40",
+                "file": "https://archive.org/download/FOXNEWSW_20260609_130000_Americas_Newsroom/FOXNEWSW_20260609_130000_Americas_Newsroom.mp4?exact=1&start=2400&end=2700",
+                "duration": 300
+        },
+        {
+                "title": "Americas Newsroom [2026-06-09 13:00] 00:45",
+                "file": "https://archive.org/download/FOXNEWSW_20260609_130000_Americas_Newsroom/FOXNEWSW_20260609_130000_Americas_Newsroom.mp4?exact=1&start=2700&end=3000",
+                "duration": 300
+        },
+        {
+                "title": "Americas Newsroom [2026-06-09 13:00] 00:50",
+                "file": "https://archive.org/download/FOXNEWSW_20260609_130000_Americas_Newsroom/FOXNEWSW_20260609_130000_Americas_Newsroom.mp4?exact=1&start=3000&end=3300",
+                "duration": 300
+        },
+        {
+                "title": "Americas Newsroom [2026-06-09 13:00] 00:55",
+                "file": "https://archive.org/download/FOXNEWSW_20260609_130000_Americas_Newsroom/FOXNEWSW_20260609_130000_Americas_Newsroom.mp4?exact=1&start=3300&end=3600",
+                "duration": 300
+        },
+        {
+                "title": "FOX and Friends [2026-06-09 12:00] 00:00",
+                "file": "https://archive.org/download/FOXNEWSW_20260609_120000_FOX_and_Friends/FOXNEWSW_20260609_120000_FOX_and_Friends.mp4?exact=1&start=0&end=300",
+                "duration": 300
+        },
+        {
+                "title": "FOX and Friends [2026-06-09 12:00] 00:05",
+                "file": "https://archive.org/download/FOXNEWSW_20260609_120000_FOX_and_Friends/FOXNEWSW_20260609_120000_FOX_and_Friends.mp4?exact=1&start=300&end=600",
+                "duration": 300
+        },
+        {
+                "title": "FOX and Friends [2026-06-09 12:00] 00:10",
+                "file": "https://archive.org/download/FOXNEWSW_20260609_120000_FOX_and_Friends/FOXNEWSW_20260609_120000_FOX_and_Friends.mp4?exact=1&start=600&end=900",
+                "duration": 300
+        },
+        {
+                "title": "FOX and Friends [2026-06-09 12:00] 00:15",
+                "file": "https://archive.org/download/FOXNEWSW_20260609_120000_FOX_and_Friends/FOXNEWSW_20260609_120000_FOX_and_Friends.mp4?exact=1&start=900&end=1200",
+                "duration": 300
+        },
+        {
+                "title": "FOX and Friends [2026-06-09 12:00] 00:20",
+                "file": "https://archive.org/download/FOXNEWSW_20260609_120000_FOX_and_Friends/FOXNEWSW_20260609_120000_FOX_and_Friends.mp4?exact=1&start=1200&end=1500",
+                "duration": 300
+        },
+        {
+                "title": "FOX and Friends [2026-06-09 12:00] 00:25",
+                "file": "https://archive.org/download/FOXNEWSW_20260609_120000_FOX_and_Friends/FOXNEWSW_20260609_120000_FOX_and_Friends.mp4?exact=1&start=1500&end=1800",
+                "duration": 300
+        },
+        {
+                "title": "FOX and Friends [2026-06-09 12:00] 00:30",
+                "file": "https://archive.org/download/FOXNEWSW_20260609_120000_FOX_and_Friends/FOXNEWSW_20260609_120000_FOX_and_Friends.mp4?exact=1&start=1800&end=2100",
+                "duration": 300
+        },
+        {
+                "title": "FOX and Friends [2026-06-09 12:00] 00:35",
+                "file": "https://archive.org/download/FOXNEWSW_20260609_120000_FOX_and_Friends/FOXNEWSW_20260609_120000_FOX_and_Friends.mp4?exact=1&start=2100&end=2400",
+                "duration": 300
+        },
+        {
+                "title": "FOX and Friends [2026-06-09 12:00] 00:40",
+                "file": "https://archive.org/download/FOXNEWSW_20260609_120000_FOX_and_Friends/FOXNEWSW_20260609_120000_FOX_and_Friends.mp4?exact=1&start=2400&end=2700",
+                "duration": 300
+        },
+        {
+                "title": "Gutfeld [2026-06-09 07:00] 00:35",
+                "file": "https://archive.org/download/FOXNEWSW_20260609_070000_Gutfeld/FOXNEWSW_20260609_070000_Gutfeld.mp4?exact=1&start=2100&end=2400",
+                "duration": 300
+        },
+        {
+                "title": "FOX and Friends [2026-06-09 12:00] 00:45",
+                "file": "https://archive.org/download/FOXNEWSW_20260609_120000_FOX_and_Friends/FOXNEWSW_20260609_120000_FOX_and_Friends.mp4?exact=1&start=2700&end=3000",
+                "duration": 300
+        },
+        {
+                "title": "FOX and Friends [2026-06-09 12:00] 00:50",
+                "file": "https://archive.org/download/FOXNEWSW_20260609_120000_FOX_and_Friends/FOXNEWSW_20260609_120000_FOX_and_Friends.mp4?exact=1&start=3000&end=3300",
+                "duration": 300
+        },
+        {
+                "title": "FOX and Friends [2026-06-09 12:00] 00:55",
+                "file": "https://archive.org/download/FOXNEWSW_20260609_120000_FOX_and_Friends/FOXNEWSW_20260609_120000_FOX_and_Friends.mp4?exact=1&start=3300&end=3600",
+                "duration": 300
+        },
+        {
+                "title": "FOX and Friends [2026-06-09 11:00] 00:00",
+                "file": "https://archive.org/download/FOXNEWSW_20260609_110000_FOX_and_Friends/FOXNEWSW_20260609_110000_FOX_and_Friends.mp4?exact=1&start=0&end=300",
+                "duration": 300
+        },
+        {
+                "title": "FOX and Friends [2026-06-09 11:00] 00:05",
+                "file": "https://archive.org/download/FOXNEWSW_20260609_110000_FOX_and_Friends/FOXNEWSW_20260609_110000_FOX_and_Friends.mp4?exact=1&start=300&end=600",
+                "duration": 300
+        },
+        {
+                "title": "FOX and Friends [2026-06-09 11:00] 00:10",
+                "file": "https://archive.org/download/FOXNEWSW_20260609_110000_FOX_and_Friends/FOXNEWSW_20260609_110000_FOX_and_Friends.mp4?exact=1&start=600&end=900",
+                "duration": 300
+        },
+        {
+                "title": "FOX and Friends [2026-06-09 11:00] 00:15",
+                "file": "https://archive.org/download/FOXNEWSW_20260609_110000_FOX_and_Friends/FOXNEWSW_20260609_110000_FOX_and_Friends.mp4?exact=1&start=900&end=1200",
+                "duration": 300
+        },
+        {
+                "title": "FOX and Friends [2026-06-09 11:00] 00:20",
+                "file": "https://archive.org/download/FOXNEWSW_20260609_110000_FOX_and_Friends/FOXNEWSW_20260609_110000_FOX_and_Friends.mp4?exact=1&start=1200&end=1500",
+                "duration": 300
+        },
+        {
+                "title": "FOX and Friends [2026-06-09 11:00] 00:25",
+                "file": "https://archive.org/download/FOXNEWSW_20260609_110000_FOX_and_Friends/FOXNEWSW_20260609_110000_FOX_and_Friends.mp4?exact=1&start=1500&end=1800",
+                "duration": 300
+        },
+        {
+                "title": "FOX and Friends [2026-06-09 11:00] 00:30",
+                "file": "https://archive.org/download/FOXNEWSW_20260609_110000_FOX_and_Friends/FOXNEWSW_20260609_110000_FOX_and_Friends.mp4?exact=1&start=1800&end=2100",
+                "duration": 300
+        },
+        {
+                "title": "FOX and Friends [2026-06-09 11:00] 00:35",
+                "file": "https://archive.org/download/FOXNEWSW_20260609_110000_FOX_and_Friends/FOXNEWSW_20260609_110000_FOX_and_Friends.mp4?exact=1&start=2100&end=2400",
+                "duration": 300
+        },
+        {
+                "title": "FOX and Friends [2026-06-09 11:00] 00:40",
+                "file": "https://archive.org/download/FOXNEWSW_20260609_110000_FOX_and_Friends/FOXNEWSW_20260609_110000_FOX_and_Friends.mp4?exact=1&start=2400&end=2700",
+                "duration": 300
+        },
+        {
+                "title": "FOX and Friends [2026-06-09 11:00] 00:45",
+                "file": "https://archive.org/download/FOXNEWSW_20260609_110000_FOX_and_Friends/FOXNEWSW_20260609_110000_FOX_and_Friends.mp4?exact=1&start=2700&end=3000",
+                "duration": 300
+        },
+        {
+                "title": "FOX and Friends [2026-06-09 11:00] 00:50",
+                "file": "https://archive.org/download/FOXNEWSW_20260609_110000_FOX_and_Friends/FOXNEWSW_20260609_110000_FOX_and_Friends.mp4?exact=1&start=3000&end=3300",
+                "duration": 300
+        },
+        {
+                "title": "FOX and Friends [2026-06-09 11:00] 00:55",
+                "file": "https://archive.org/download/FOXNEWSW_20260609_110000_FOX_and_Friends/FOXNEWSW_20260609_110000_FOX_and_Friends.mp4?exact=1&start=3300&end=3600",
+                "duration": 300
+        },
+        {
+                "title": "FOX and Friends [2026-06-09 10:00] 00:00",
+                "file": "https://archive.org/download/FOXNEWSW_20260609_100000_FOX_and_Friends/FOXNEWSW_20260609_100000_FOX_and_Friends.mp4?exact=1&start=0&end=300",
+                "duration": 300
+        },
+        {
+                "title": "FOX and Friends [2026-06-09 10:00] 00:05",
+                "file": "https://archive.org/download/FOXNEWSW_20260609_100000_FOX_and_Friends/FOXNEWSW_20260609_100000_FOX_and_Friends.mp4?exact=1&start=300&end=600",
+                "duration": 300
+        },
+        {
+                "title": "FOX and Friends [2026-06-09 10:00] 00:10",
+                "file": "https://archive.org/download/FOXNEWSW_20260609_100000_FOX_and_Friends/FOXNEWSW_20260609_100000_FOX_and_Friends.mp4?exact=1&start=600&end=900",
+                "duration": 300
+        },
+        {
+                "title": "FOX and Friends [2026-06-09 10:00] 00:15",
+                "file": "https://archive.org/download/FOXNEWSW_20260609_100000_FOX_and_Friends/FOXNEWSW_20260609_100000_FOX_and_Friends.mp4?exact=1&start=900&end=1200",
+                "duration": 300
+        },
+        {
+                "title": "FOX and Friends [2026-06-09 10:00] 00:20",
+                "file": "https://archive.org/download/FOXNEWSW_20260609_100000_FOX_and_Friends/FOXNEWSW_20260609_100000_FOX_and_Friends.mp4?exact=1&start=1200&end=1500",
+                "duration": 300
+        },
+        {
+                "title": "FOX and Friends [2026-06-09 10:00] 00:25",
+                "file": "https://archive.org/download/FOXNEWSW_20260609_100000_FOX_and_Friends/FOXNEWSW_20260609_100000_FOX_and_Friends.mp4?exact=1&start=1500&end=1800",
+                "duration": 300
+        },
+        {
+                "title": "FOX and Friends [2026-06-09 10:00] 00:30",
+                "file": "https://archive.org/download/FOXNEWSW_20260609_100000_FOX_and_Friends/FOXNEWSW_20260609_100000_FOX_and_Friends.mp4?exact=1&start=1800&end=2100",
+                "duration": 300
+        },
+        {
+                "title": "FOX and Friends [2026-06-09 10:00] 00:35",
+                "file": "https://archive.org/download/FOXNEWSW_20260609_100000_FOX_and_Friends/FOXNEWSW_20260609_100000_FOX_and_Friends.mp4?exact=1&start=2100&end=2400",
+                "duration": 300
+        },
+        {
+                "title": "FOX and Friends [2026-06-09 10:00] 00:40",
+                "file": "https://archive.org/download/FOXNEWSW_20260609_100000_FOX_and_Friends/FOXNEWSW_20260609_100000_FOX_and_Friends.mp4?exact=1&start=2400&end=2700",
+                "duration": 300
+        },
+        {
+                "title": "FOX and Friends [2026-06-09 10:00] 00:45",
+                "file": "https://archive.org/download/FOXNEWSW_20260609_100000_FOX_and_Friends/FOXNEWSW_20260609_100000_FOX_and_Friends.mp4?exact=1&start=2700&end=3000",
+                "duration": 300
+        },
+        {
+                "title": "FOX and Friends [2026-06-09 10:00] 00:50",
+                "file": "https://archive.org/download/FOXNEWSW_20260609_100000_FOX_and_Friends/FOXNEWSW_20260609_100000_FOX_and_Friends.mp4?exact=1&start=3000&end=3300",
+                "duration": 300
+        },
+        {
+                "title": "FOX and Friends [2026-06-09 10:00] 00:55",
+                "file": "https://archive.org/download/FOXNEWSW_20260609_100000_FOX_and_Friends/FOXNEWSW_20260609_100000_FOX_and_Friends.mp4?exact=1&start=3300&end=3600",
+                "duration": 300
+        },
+        {
+                "title": "FOX  Friends First [2026-06-09 09:00] 00:00",
+                "file": "https://archive.org/download/FOXNEWSW_20260609_090000_FOX__Friends_First/FOXNEWSW_20260609_090000_FOX__Friends_First.mp4?exact=1&start=0&end=300",
+                "duration": 300
+        },
+        {
+                "title": "FOX  Friends First [2026-06-09 09:00] 00:05",
+                "file": "https://archive.org/download/FOXNEWSW_20260609_090000_FOX__Friends_First/FOXNEWSW_20260609_090000_FOX__Friends_First.mp4?exact=1&start=300&end=600",
+                "duration": 300
+        },
+        {
+                "title": "Gutfeld [2026-06-09 07:00] 00:40",
+                "file": "https://archive.org/download/FOXNEWSW_20260609_070000_Gutfeld/FOXNEWSW_20260609_070000_Gutfeld.mp4?exact=1&start=2400&end=2700",
+                "duration": 300
+        },
+        {
+                "title": "FOX  Friends First [2026-06-09 09:00] 00:10",
+                "file": "https://archive.org/download/FOXNEWSW_20260609_090000_FOX__Friends_First/FOXNEWSW_20260609_090000_FOX__Friends_First.mp4?exact=1&start=600&end=900",
+                "duration": 300
+        },
+        {
+                "title": "FOX  Friends First [2026-06-09 09:00] 00:15",
+                "file": "https://archive.org/download/FOXNEWSW_20260609_090000_FOX__Friends_First/FOXNEWSW_20260609_090000_FOX__Friends_First.mp4?exact=1&start=900&end=1200",
+                "duration": 300
+        },
+        {
+                "title": "FOX  Friends First [2026-06-09 09:00] 00:20",
+                "file": "https://archive.org/download/FOXNEWSW_20260609_090000_FOX__Friends_First/FOXNEWSW_20260609_090000_FOX__Friends_First.mp4?exact=1&start=1200&end=1500",
+                "duration": 300
+        },
+        {
+                "title": "FOX  Friends First [2026-06-09 09:00] 00:25",
+                "file": "https://archive.org/download/FOXNEWSW_20260609_090000_FOX__Friends_First/FOXNEWSW_20260609_090000_FOX__Friends_First.mp4?exact=1&start=1500&end=1800",
+                "duration": 300
+        },
+        {
+                "title": "FOX  Friends First [2026-06-09 09:00] 00:30",
+                "file": "https://archive.org/download/FOXNEWSW_20260609_090000_FOX__Friends_First/FOXNEWSW_20260609_090000_FOX__Friends_First.mp4?exact=1&start=1800&end=2100",
+                "duration": 300
+        },
+        {
+                "title": "FOX  Friends First [2026-06-09 09:00] 00:35",
+                "file": "https://archive.org/download/FOXNEWSW_20260609_090000_FOX__Friends_First/FOXNEWSW_20260609_090000_FOX__Friends_First.mp4?exact=1&start=2100&end=2400",
+                "duration": 300
+        },
+        {
+                "title": "FOX  Friends First [2026-06-09 09:00] 00:40",
+                "file": "https://archive.org/download/FOXNEWSW_20260609_090000_FOX__Friends_First/FOXNEWSW_20260609_090000_FOX__Friends_First.mp4?exact=1&start=2400&end=2700",
+                "duration": 300
+        },
+        {
+                "title": "FOX  Friends First [2026-06-09 09:00] 00:45",
+                "file": "https://archive.org/download/FOXNEWSW_20260609_090000_FOX__Friends_First/FOXNEWSW_20260609_090000_FOX__Friends_First.mp4?exact=1&start=2700&end=3000",
+                "duration": 300
+        },
+        {
+                "title": "FOX  Friends First [2026-06-09 09:00] 00:50",
+                "file": "https://archive.org/download/FOXNEWSW_20260609_090000_FOX__Friends_First/FOXNEWSW_20260609_090000_FOX__Friends_First.mp4?exact=1&start=3000&end=3300",
+                "duration": 300
+        },
+        {
+                "title": "FOX  Friends First [2026-06-09 09:00] 00:55",
+                "file": "https://archive.org/download/FOXNEWSW_20260609_090000_FOX__Friends_First/FOXNEWSW_20260609_090000_FOX__Friends_First.mp4?exact=1&start=3300&end=3600",
+                "duration": 300
+        },
+        {
+                "title": "Fox News at Night [2026-06-09 08:00] 00:00",
+                "file": "https://archive.org/download/FOXNEWSW_20260609_080000_Fox_News_at_Night/FOXNEWSW_20260609_080000_Fox_News_at_Night.mp4?exact=1&start=0&end=300",
+                "duration": 300
+        },
+        {
+                "title": "Fox News at Night [2026-06-09 08:00] 00:05",
+                "file": "https://archive.org/download/FOXNEWSW_20260609_080000_Fox_News_at_Night/FOXNEWSW_20260609_080000_Fox_News_at_Night.mp4?exact=1&start=300&end=600",
+                "duration": 300
+        },
+        {
+                "title": "Fox News at Night [2026-06-09 08:00] 00:10",
+                "file": "https://archive.org/download/FOXNEWSW_20260609_080000_Fox_News_at_Night/FOXNEWSW_20260609_080000_Fox_News_at_Night.mp4?exact=1&start=600&end=900",
+                "duration": 300
+        },
+        {
+                "title": "Fox News at Night [2026-06-09 08:00] 00:15",
+                "file": "https://archive.org/download/FOXNEWSW_20260609_080000_Fox_News_at_Night/FOXNEWSW_20260609_080000_Fox_News_at_Night.mp4?exact=1&start=900&end=1200",
+                "duration": 300
+        },
+        {
+                "title": "Fox News at Night [2026-06-09 08:00] 00:20",
+                "file": "https://archive.org/download/FOXNEWSW_20260609_080000_Fox_News_at_Night/FOXNEWSW_20260609_080000_Fox_News_at_Night.mp4?exact=1&start=1200&end=1500",
+                "duration": 300
+        },
+        {
+                "title": "Fox News at Night [2026-06-09 08:00] 00:25",
+                "file": "https://archive.org/download/FOXNEWSW_20260609_080000_Fox_News_at_Night/FOXNEWSW_20260609_080000_Fox_News_at_Night.mp4?exact=1&start=1500&end=1800",
+                "duration": 300
+        },
+        {
+                "title": "Fox News at Night [2026-06-09 08:00] 00:30",
+                "file": "https://archive.org/download/FOXNEWSW_20260609_080000_Fox_News_at_Night/FOXNEWSW_20260609_080000_Fox_News_at_Night.mp4?exact=1&start=1800&end=2100",
+                "duration": 300
+        },
+        {
+                "title": "Fox News at Night [2026-06-09 08:00] 00:35",
+                "file": "https://archive.org/download/FOXNEWSW_20260609_080000_Fox_News_at_Night/FOXNEWSW_20260609_080000_Fox_News_at_Night.mp4?exact=1&start=2100&end=2400",
+                "duration": 300
+        },
+        {
+                "title": "Fox News at Night [2026-06-09 08:00] 00:40",
+                "file": "https://archive.org/download/FOXNEWSW_20260609_080000_Fox_News_at_Night/FOXNEWSW_20260609_080000_Fox_News_at_Night.mp4?exact=1&start=2400&end=2700",
+                "duration": 300
+        },
+        {
+                "title": "Fox News at Night [2026-06-09 08:00] 00:45",
+                "file": "https://archive.org/download/FOXNEWSW_20260609_080000_Fox_News_at_Night/FOXNEWSW_20260609_080000_Fox_News_at_Night.mp4?exact=1&start=2700&end=3000",
+                "duration": 300
+        },
+        {
+                "title": "Fox News at Night [2026-06-09 08:00] 00:50",
+                "file": "https://archive.org/download/FOXNEWSW_20260609_080000_Fox_News_at_Night/FOXNEWSW_20260609_080000_Fox_News_at_Night.mp4?exact=1&start=3000&end=3300",
+                "duration": 300
+        },
+        {
+                "title": "Fox News at Night [2026-06-09 08:00] 00:55",
+                "file": "https://archive.org/download/FOXNEWSW_20260609_080000_Fox_News_at_Night/FOXNEWSW_20260609_080000_Fox_News_at_Night.mp4?exact=1&start=3300&end=3600",
+                "duration": 300
+        },
+        {
+                "title": "Gutfeld [2026-06-09 07:00] 00:00",
+                "file": "https://archive.org/download/FOXNEWSW_20260609_070000_Gutfeld/FOXNEWSW_20260609_070000_Gutfeld.mp4?exact=1&start=0&end=300",
+                "duration": 300
+        },
+        {
+                "title": "Gutfeld [2026-06-09 07:00] 00:05",
+                "file": "https://archive.org/download/FOXNEWSW_20260609_070000_Gutfeld/FOXNEWSW_20260609_070000_Gutfeld.mp4?exact=1&start=300&end=600",
+                "duration": 300
+        },
+        {
+                "title": "Gutfeld [2026-06-09 07:00] 00:10",
+                "file": "https://archive.org/download/FOXNEWSW_20260609_070000_Gutfeld/FOXNEWSW_20260609_070000_Gutfeld.mp4?exact=1&start=600&end=900",
+                "duration": 300
+        },
+        {
+                "title": "Gutfeld [2026-06-09 07:00] 00:15",
+                "file": "https://archive.org/download/FOXNEWSW_20260609_070000_Gutfeld/FOXNEWSW_20260609_070000_Gutfeld.mp4?exact=1&start=900&end=1200",
+                "duration": 300
+        },
+        {
+                "title": "Gutfeld [2026-06-09 07:00] 00:20",
+                "file": "https://archive.org/download/FOXNEWSW_20260609_070000_Gutfeld/FOXNEWSW_20260609_070000_Gutfeld.mp4?exact=1&start=1200&end=1500",
+                "duration": 300
+        },
+        {
+                "title": "Gutfeld [2026-06-09 07:00] 00:25",
+                "file": "https://archive.org/download/FOXNEWSW_20260609_070000_Gutfeld/FOXNEWSW_20260609_070000_Gutfeld.mp4?exact=1&start=1500&end=1800",
+                "duration": 300
+        },
+        {
+                "title": "Gutfeld [2026-06-09 07:00] 00:30",
+                "file": "https://archive.org/download/FOXNEWSW_20260609_070000_Gutfeld/FOXNEWSW_20260609_070000_Gutfeld.mp4?exact=1&start=1800&end=2100",
+                "duration": 300
+        },
+        {
+                "title": "Gutfeld [2026-06-09 07:00] 00:45",
+                "file": "https://archive.org/download/FOXNEWSW_20260609_070000_Gutfeld/FOXNEWSW_20260609_070000_Gutfeld.mp4?exact=1&start=2700&end=3000",
+                "duration": 300
+        },
+        {
+                "title": "Gutfeld [2026-06-09 07:00] 00:50",
+                "file": "https://archive.org/download/FOXNEWSW_20260609_070000_Gutfeld/FOXNEWSW_20260609_070000_Gutfeld.mp4?exact=1&start=3000&end=3300",
+                "duration": 300
+        },
+        {
+                "title": "Gutfeld [2026-06-09 07:00] 00:55",
+                "file": "https://archive.org/download/FOXNEWSW_20260609_070000_Gutfeld/FOXNEWSW_20260609_070000_Gutfeld.mp4?exact=1&start=3300&end=3600",
+                "duration": 300
+        },
+        {
+                "title": "Hannity [2026-06-09 06:00] 00:00",
+                "file": "https://archive.org/download/FOXNEWSW_20260609_060000_Hannity/FOXNEWSW_20260609_060000_Hannity.mp4?exact=1&start=0&end=300",
+                "duration": 300
+        },
+        {
+                "title": "Hannity [2026-06-09 06:00] 00:05",
+                "file": "https://archive.org/download/FOXNEWSW_20260609_060000_Hannity/FOXNEWSW_20260609_060000_Hannity.mp4?exact=1&start=300&end=600",
+                "duration": 300
+        },
+        {
+                "title": "Hannity [2026-06-09 06:00] 00:10",
+                "file": "https://archive.org/download/FOXNEWSW_20260609_060000_Hannity/FOXNEWSW_20260609_060000_Hannity.mp4?exact=1&start=600&end=900",
+                "duration": 300
+        },
+        {
+                "title": "Hannity [2026-06-09 06:00] 00:15",
+                "file": "https://archive.org/download/FOXNEWSW_20260609_060000_Hannity/FOXNEWSW_20260609_060000_Hannity.mp4?exact=1&start=900&end=1200",
+                "duration": 300
+        },
+        {
+                "title": "Hannity [2026-06-09 06:00] 00:20",
+                "file": "https://archive.org/download/FOXNEWSW_20260609_060000_Hannity/FOXNEWSW_20260609_060000_Hannity.mp4?exact=1&start=1200&end=1500",
+                "duration": 300
+        },
+        {
+                "title": "Hannity [2026-06-09 06:00] 00:25",
+                "file": "https://archive.org/download/FOXNEWSW_20260609_060000_Hannity/FOXNEWSW_20260609_060000_Hannity.mp4?exact=1&start=1500&end=1800",
+                "duration": 300
+        },
+        {
+                "title": "Hannity [2026-06-09 06:00] 00:30",
+                "file": "https://archive.org/download/FOXNEWSW_20260609_060000_Hannity/FOXNEWSW_20260609_060000_Hannity.mp4?exact=1&start=1800&end=2100",
+                "duration": 300
+        },
+        {
+                "title": "Hannity [2026-06-09 06:00] 00:35",
+                "file": "https://archive.org/download/FOXNEWSW_20260609_060000_Hannity/FOXNEWSW_20260609_060000_Hannity.mp4?exact=1&start=2100&end=2400",
+                "duration": 300
+        },
+        {
+                "title": "Hannity [2026-06-09 06:00] 00:40",
+                "file": "https://archive.org/download/FOXNEWSW_20260609_060000_Hannity/FOXNEWSW_20260609_060000_Hannity.mp4?exact=1&start=2400&end=2700",
+                "duration": 300
+        },
+        {
+                "title": "Hannity [2026-06-09 06:00] 00:45",
+                "file": "https://archive.org/download/FOXNEWSW_20260609_060000_Hannity/FOXNEWSW_20260609_060000_Hannity.mp4?exact=1&start=2700&end=3000",
+                "duration": 300
+        },
+        {
+                "title": "Hannity [2026-06-09 06:00] 00:50",
+                "file": "https://archive.org/download/FOXNEWSW_20260609_060000_Hannity/FOXNEWSW_20260609_060000_Hannity.mp4?exact=1&start=3000&end=3300",
+                "duration": 300
+        },
+        {
+                "title": "Hannity [2026-06-09 06:00] 00:55",
+                "file": "https://archive.org/download/FOXNEWSW_20260609_060000_Hannity/FOXNEWSW_20260609_060000_Hannity.mp4?exact=1&start=3300&end=3600",
+                "duration": 300
+        },
+        {
+                "title": "Jesse Watters Primetime [2026-06-09 05:00] 00:00",
+                "file": "https://archive.org/download/FOXNEWSW_20260609_050000_Jesse_Watters_Primetime/FOXNEWSW_20260609_050000_Jesse_Watters_Primetime.mp4?exact=1&start=0&end=300",
+                "duration": 300
+        },
+        {
+                "title": "Jesse Watters Primetime [2026-06-09 05:00] 00:05",
+                "file": "https://archive.org/download/FOXNEWSW_20260609_050000_Jesse_Watters_Primetime/FOXNEWSW_20260609_050000_Jesse_Watters_Primetime.mp4?exact=1&start=300&end=600",
+                "duration": 300
+        },
+        {
+                "title": "Jesse Watters Primetime [2026-06-09 05:00] 00:10",
+                "file": "https://archive.org/download/FOXNEWSW_20260609_050000_Jesse_Watters_Primetime/FOXNEWSW_20260609_050000_Jesse_Watters_Primetime.mp4?exact=1&start=600&end=900",
+                "duration": 300
+        },
+        {
+                "title": "Jesse Watters Primetime [2026-06-09 05:00] 00:15",
+                "file": "https://archive.org/download/FOXNEWSW_20260609_050000_Jesse_Watters_Primetime/FOXNEWSW_20260609_050000_Jesse_Watters_Primetime.mp4?exact=1&start=900&end=1200",
+                "duration": 300
+        },
+        {
+                "title": "Jesse Watters Primetime [2026-06-09 05:00] 00:20",
+                "file": "https://archive.org/download/FOXNEWSW_20260609_050000_Jesse_Watters_Primetime/FOXNEWSW_20260609_050000_Jesse_Watters_Primetime.mp4?exact=1&start=1200&end=1500",
+                "duration": 300
+        },
+        {
+                "title": "Hannity [2026-06-09 01:00] 00:30",
+                "file": "https://archive.org/download/FOXNEWSW_20260609_010000_Hannity/FOXNEWSW_20260609_010000_Hannity.mp4?exact=1&start=1800&end=2100",
+                "duration": 300
+        },
+        {
+                "title": "Jesse Watters Primetime [2026-06-09 05:00] 00:25",
+                "file": "https://archive.org/download/FOXNEWSW_20260609_050000_Jesse_Watters_Primetime/FOXNEWSW_20260609_050000_Jesse_Watters_Primetime.mp4?exact=1&start=1500&end=1800",
+                "duration": 300
+        },
+        {
+                "title": "Jesse Watters Primetime [2026-06-09 05:00] 00:30",
+                "file": "https://archive.org/download/FOXNEWSW_20260609_050000_Jesse_Watters_Primetime/FOXNEWSW_20260609_050000_Jesse_Watters_Primetime.mp4?exact=1&start=1800&end=2100",
+                "duration": 300
+        },
+        {
+                "title": "Jesse Watters Primetime [2026-06-09 05:00] 00:35",
+                "file": "https://archive.org/download/FOXNEWSW_20260609_050000_Jesse_Watters_Primetime/FOXNEWSW_20260609_050000_Jesse_Watters_Primetime.mp4?exact=1&start=2100&end=2400",
+                "duration": 300
+        },
+        {
+                "title": "Jesse Watters Primetime [2026-06-09 05:00] 00:40",
+                "file": "https://archive.org/download/FOXNEWSW_20260609_050000_Jesse_Watters_Primetime/FOXNEWSW_20260609_050000_Jesse_Watters_Primetime.mp4?exact=1&start=2400&end=2700",
+                "duration": 300
+        },
+        {
+                "title": "Jesse Watters Primetime [2026-06-09 05:00] 00:45",
+                "file": "https://archive.org/download/FOXNEWSW_20260609_050000_Jesse_Watters_Primetime/FOXNEWSW_20260609_050000_Jesse_Watters_Primetime.mp4?exact=1&start=2700&end=3000",
+                "duration": 300
+        },
+        {
+                "title": "Jesse Watters Primetime [2026-06-09 05:00] 00:50",
+                "file": "https://archive.org/download/FOXNEWSW_20260609_050000_Jesse_Watters_Primetime/FOXNEWSW_20260609_050000_Jesse_Watters_Primetime.mp4?exact=1&start=3000&end=3300",
+                "duration": 300
+        },
+        {
+                "title": "Jesse Watters Primetime [2026-06-09 05:00] 00:55",
+                "file": "https://archive.org/download/FOXNEWSW_20260609_050000_Jesse_Watters_Primetime/FOXNEWSW_20260609_050000_Jesse_Watters_Primetime.mp4?exact=1&start=3300&end=3600",
+                "duration": 300
+        },
+        {
+                "title": "The Five [2026-06-09 04:00] 00:00",
+                "file": "https://archive.org/download/FOXNEWSW_20260609_040000_The_Five/FOXNEWSW_20260609_040000_The_Five.mp4?exact=1&start=0&end=300",
+                "duration": 300
+        },
+        {
+                "title": "The Five [2026-06-09 04:00] 00:05",
+                "file": "https://archive.org/download/FOXNEWSW_20260609_040000_The_Five/FOXNEWSW_20260609_040000_The_Five.mp4?exact=1&start=300&end=600",
+                "duration": 300
+        },
+        {
+                "title": "The Five [2026-06-09 04:00] 00:10",
+                "file": "https://archive.org/download/FOXNEWSW_20260609_040000_The_Five/FOXNEWSW_20260609_040000_The_Five.mp4?exact=1&start=600&end=900",
+                "duration": 300
+        },
+        {
+                "title": "The Five [2026-06-09 04:00] 00:15",
+                "file": "https://archive.org/download/FOXNEWSW_20260609_040000_The_Five/FOXNEWSW_20260609_040000_The_Five.mp4?exact=1&start=900&end=1200",
+                "duration": 300
+        },
+        {
+                "title": "The Five [2026-06-09 04:00] 00:20",
+                "file": "https://archive.org/download/FOXNEWSW_20260609_040000_The_Five/FOXNEWSW_20260609_040000_The_Five.mp4?exact=1&start=1200&end=1500",
+                "duration": 300
+        },
+        {
+                "title": "The Five [2026-06-09 04:00] 00:25",
+                "file": "https://archive.org/download/FOXNEWSW_20260609_040000_The_Five/FOXNEWSW_20260609_040000_The_Five.mp4?exact=1&start=1500&end=1800",
+                "duration": 300
+        },
+        {
+                "title": "The Five [2026-06-09 04:00] 00:30",
+                "file": "https://archive.org/download/FOXNEWSW_20260609_040000_The_Five/FOXNEWSW_20260609_040000_The_Five.mp4?exact=1&start=1800&end=2100",
+                "duration": 300
+        },
+        {
+                "title": "The Five [2026-06-09 04:00] 00:35",
+                "file": "https://archive.org/download/FOXNEWSW_20260609_040000_The_Five/FOXNEWSW_20260609_040000_The_Five.mp4?exact=1&start=2100&end=2400",
+                "duration": 300
+        },
+        {
+                "title": "The Five [2026-06-09 04:00] 00:40",
+                "file": "https://archive.org/download/FOXNEWSW_20260609_040000_The_Five/FOXNEWSW_20260609_040000_The_Five.mp4?exact=1&start=2400&end=2700",
+                "duration": 300
+        },
+        {
+                "title": "The Five [2026-06-09 04:00] 00:45",
+                "file": "https://archive.org/download/FOXNEWSW_20260609_040000_The_Five/FOXNEWSW_20260609_040000_The_Five.mp4?exact=1&start=2700&end=3000",
+                "duration": 300
+        },
+        {
+                "title": "The Five [2026-06-09 04:00] 00:50",
+                "file": "https://archive.org/download/FOXNEWSW_20260609_040000_The_Five/FOXNEWSW_20260609_040000_The_Five.mp4?exact=1&start=3000&end=3300",
+                "duration": 300
+        },
+        {
+                "title": "The Five [2026-06-09 04:00] 00:55",
+                "file": "https://archive.org/download/FOXNEWSW_20260609_040000_The_Five/FOXNEWSW_20260609_040000_The_Five.mp4?exact=1&start=3300&end=3600",
+                "duration": 300
+        },
+        {
+                "title": "Reporter [2026-06-09 14:45] 00:00",
+                "file": "https://archive.org/download/DW_20260609_144500_Reporter/DW_20260609_144500_Reporter.mp4?exact=1&start=0&end=300",
+                "duration": 300
+        },
+        {
+                "title": "Fox News at Night [2026-06-09 03:00] 00:00",
+                "file": "https://archive.org/download/FOXNEWSW_20260609_030000_Fox_News_at_Night/FOXNEWSW_20260609_030000_Fox_News_at_Night.mp4?exact=1&start=0&end=300",
+                "duration": 300
+        },
+        {
+                "title": "Fox News at Night [2026-06-09 03:00] 00:05",
+                "file": "https://archive.org/download/FOXNEWSW_20260609_030000_Fox_News_at_Night/FOXNEWSW_20260609_030000_Fox_News_at_Night.mp4?exact=1&start=300&end=600",
+                "duration": 300
+        },
+        {
+                "title": "Fox News at Night [2026-06-09 03:00] 00:10",
+                "file": "https://archive.org/download/FOXNEWSW_20260609_030000_Fox_News_at_Night/FOXNEWSW_20260609_030000_Fox_News_at_Night.mp4?exact=1&start=600&end=900",
+                "duration": 300
+        },
+        {
+                "title": "Fox News at Night [2026-06-09 03:00] 00:15",
+                "file": "https://archive.org/download/FOXNEWSW_20260609_030000_Fox_News_at_Night/FOXNEWSW_20260609_030000_Fox_News_at_Night.mp4?exact=1&start=900&end=1200",
+                "duration": 300
+        },
+        {
+                "title": "Fox News at Night [2026-06-09 03:00] 00:20",
+                "file": "https://archive.org/download/FOXNEWSW_20260609_030000_Fox_News_at_Night/FOXNEWSW_20260609_030000_Fox_News_at_Night.mp4?exact=1&start=1200&end=1500",
+                "duration": 300
+        },
+        {
+                "title": "Fox News at Night [2026-06-09 03:00] 00:25",
+                "file": "https://archive.org/download/FOXNEWSW_20260609_030000_Fox_News_at_Night/FOXNEWSW_20260609_030000_Fox_News_at_Night.mp4?exact=1&start=1500&end=1800",
+                "duration": 300
+        },
+        {
+                "title": "Fox News at Night [2026-06-09 03:00] 00:30",
+                "file": "https://archive.org/download/FOXNEWSW_20260609_030000_Fox_News_at_Night/FOXNEWSW_20260609_030000_Fox_News_at_Night.mp4?exact=1&start=1800&end=2100",
+                "duration": 300
+        },
+        {
+                "title": "Fox News at Night [2026-06-09 03:00] 00:35",
+                "file": "https://archive.org/download/FOXNEWSW_20260609_030000_Fox_News_at_Night/FOXNEWSW_20260609_030000_Fox_News_at_Night.mp4?exact=1&start=2100&end=2400",
+                "duration": 300
+        },
+        {
+                "title": "Fox News at Night [2026-06-09 03:00] 00:40",
+                "file": "https://archive.org/download/FOXNEWSW_20260609_030000_Fox_News_at_Night/FOXNEWSW_20260609_030000_Fox_News_at_Night.mp4?exact=1&start=2400&end=2700",
+                "duration": 300
+        },
+        {
+                "title": "Fox News at Night [2026-06-09 03:00] 00:45",
+                "file": "https://archive.org/download/FOXNEWSW_20260609_030000_Fox_News_at_Night/FOXNEWSW_20260609_030000_Fox_News_at_Night.mp4?exact=1&start=2700&end=3000",
+                "duration": 300
+        },
+        {
+                "title": "Fox News at Night [2026-06-09 03:00] 00:50",
+                "file": "https://archive.org/download/FOXNEWSW_20260609_030000_Fox_News_at_Night/FOXNEWSW_20260609_030000_Fox_News_at_Night.mp4?exact=1&start=3000&end=3300",
+                "duration": 300
+        },
+        {
+                "title": "Fox News at Night [2026-06-09 03:00] 00:55",
+                "file": "https://archive.org/download/FOXNEWSW_20260609_030000_Fox_News_at_Night/FOXNEWSW_20260609_030000_Fox_News_at_Night.mp4?exact=1&start=3300&end=3600",
+                "duration": 300
+        },
+        {
+                "title": "Gutfeld [2026-06-09 02:00] 00:00",
+                "file": "https://archive.org/download/FOXNEWSW_20260609_020000_Gutfeld/FOXNEWSW_20260609_020000_Gutfeld.mp4?exact=1&start=0&end=300",
+                "duration": 300
+        },
+        {
+                "title": "Gutfeld [2026-06-09 02:00] 00:05",
+                "file": "https://archive.org/download/FOXNEWSW_20260609_020000_Gutfeld/FOXNEWSW_20260609_020000_Gutfeld.mp4?exact=1&start=300&end=600",
+                "duration": 300
+        },
+        {
+                "title": "Gutfeld [2026-06-09 02:00] 00:10",
+                "file": "https://archive.org/download/FOXNEWSW_20260609_020000_Gutfeld/FOXNEWSW_20260609_020000_Gutfeld.mp4?exact=1&start=600&end=900",
+                "duration": 300
+        },
+        {
+                "title": "Gutfeld [2026-06-09 02:00] 00:15",
+                "file": "https://archive.org/download/FOXNEWSW_20260609_020000_Gutfeld/FOXNEWSW_20260609_020000_Gutfeld.mp4?exact=1&start=900&end=1200",
+                "duration": 300
+        },
+        {
+                "title": "Gutfeld [2026-06-09 02:00] 00:20",
+                "file": "https://archive.org/download/FOXNEWSW_20260609_020000_Gutfeld/FOXNEWSW_20260609_020000_Gutfeld.mp4?exact=1&start=1200&end=1500",
+                "duration": 300
+        },
+        {
+                "title": "Gutfeld [2026-06-09 02:00] 00:25",
+                "file": "https://archive.org/download/FOXNEWSW_20260609_020000_Gutfeld/FOXNEWSW_20260609_020000_Gutfeld.mp4?exact=1&start=1500&end=1800",
+                "duration": 300
+        },
+        {
+                "title": "Gutfeld [2026-06-09 02:00] 00:30",
+                "file": "https://archive.org/download/FOXNEWSW_20260609_020000_Gutfeld/FOXNEWSW_20260609_020000_Gutfeld.mp4?exact=1&start=1800&end=2100",
+                "duration": 300
+        },
+        {
+                "title": "Gutfeld [2026-06-09 02:00] 00:35",
+                "file": "https://archive.org/download/FOXNEWSW_20260609_020000_Gutfeld/FOXNEWSW_20260609_020000_Gutfeld.mp4?exact=1&start=2100&end=2400",
+                "duration": 300
+        },
+        {
+                "title": "Gutfeld [2026-06-09 02:00] 00:40",
+                "file": "https://archive.org/download/FOXNEWSW_20260609_020000_Gutfeld/FOXNEWSW_20260609_020000_Gutfeld.mp4?exact=1&start=2400&end=2700",
+                "duration": 300
+        },
+        {
+                "title": "Gutfeld [2026-06-09 02:00] 00:45",
+                "file": "https://archive.org/download/FOXNEWSW_20260609_020000_Gutfeld/FOXNEWSW_20260609_020000_Gutfeld.mp4?exact=1&start=2700&end=3000",
+                "duration": 300
+        },
+        {
+                "title": "Gutfeld [2026-06-09 02:00] 00:50",
+                "file": "https://archive.org/download/FOXNEWSW_20260609_020000_Gutfeld/FOXNEWSW_20260609_020000_Gutfeld.mp4?exact=1&start=3000&end=3300",
+                "duration": 300
+        },
+        {
+                "title": "Gutfeld [2026-06-09 02:00] 00:55",
+                "file": "https://archive.org/download/FOXNEWSW_20260609_020000_Gutfeld/FOXNEWSW_20260609_020000_Gutfeld.mp4?exact=1&start=3300&end=3600",
+                "duration": 300
+        },
+        {
+                "title": "Hannity [2026-06-09 01:00] 00:00",
+                "file": "https://archive.org/download/FOXNEWSW_20260609_010000_Hannity/FOXNEWSW_20260609_010000_Hannity.mp4?exact=1&start=0&end=300",
+                "duration": 300
+        },
+        {
+                "title": "Hannity [2026-06-09 01:00] 00:05",
+                "file": "https://archive.org/download/FOXNEWSW_20260609_010000_Hannity/FOXNEWSW_20260609_010000_Hannity.mp4?exact=1&start=300&end=600",
+                "duration": 300
+        },
+        {
+                "title": "Hannity [2026-06-09 01:00] 00:10",
+                "file": "https://archive.org/download/FOXNEWSW_20260609_010000_Hannity/FOXNEWSW_20260609_010000_Hannity.mp4?exact=1&start=600&end=900",
+                "duration": 300
+        },
+        {
+                "title": "Hannity [2026-06-09 01:00] 00:15",
+                "file": "https://archive.org/download/FOXNEWSW_20260609_010000_Hannity/FOXNEWSW_20260609_010000_Hannity.mp4?exact=1&start=900&end=1200",
+                "duration": 300
+        },
+        {
+                "title": "Hannity [2026-06-09 01:00] 00:20",
+                "file": "https://archive.org/download/FOXNEWSW_20260609_010000_Hannity/FOXNEWSW_20260609_010000_Hannity.mp4?exact=1&start=1200&end=1500",
+                "duration": 300
+        },
+        {
+                "title": "Hannity [2026-06-09 01:00] 00:25",
+                "file": "https://archive.org/download/FOXNEWSW_20260609_010000_Hannity/FOXNEWSW_20260609_010000_Hannity.mp4?exact=1&start=1500&end=1800",
+                "duration": 300
+        },
+        {
+                "title": "Hannity [2026-06-09 01:00] 00:35",
+                "file": "https://archive.org/download/FOXNEWSW_20260609_010000_Hannity/FOXNEWSW_20260609_010000_Hannity.mp4?exact=1&start=2100&end=2400",
+                "duration": 300
+        },
+        {
+                "title": "Hannity [2026-06-09 01:00] 00:40",
+                "file": "https://archive.org/download/FOXNEWSW_20260609_010000_Hannity/FOXNEWSW_20260609_010000_Hannity.mp4?exact=1&start=2400&end=2700",
+                "duration": 300
+        },
+        {
+                "title": "Hannity [2026-06-09 01:00] 00:45",
+                "file": "https://archive.org/download/FOXNEWSW_20260609_010000_Hannity/FOXNEWSW_20260609_010000_Hannity.mp4?exact=1&start=2700&end=3000",
+                "duration": 300
+        },
+        {
+                "title": "Hannity [2026-06-09 01:00] 00:50",
+                "file": "https://archive.org/download/FOXNEWSW_20260609_010000_Hannity/FOXNEWSW_20260609_010000_Hannity.mp4?exact=1&start=3000&end=3300",
+                "duration": 300
+        },
+        {
+                "title": "Hannity [2026-06-09 01:00] 00:55",
+                "file": "https://archive.org/download/FOXNEWSW_20260609_010000_Hannity/FOXNEWSW_20260609_010000_Hannity.mp4?exact=1&start=3300&end=3600",
+                "duration": 300
+        },
+        {
+                "title": "Jesse Watters Primetime [2026-06-09 00:00] 00:00",
+                "file": "https://archive.org/download/FOXNEWSW_20260609_000000_Jesse_Watters_Primetime/FOXNEWSW_20260609_000000_Jesse_Watters_Primetime.mp4?exact=1&start=0&end=300",
+                "duration": 300
+        },
+        {
+                "title": "Jesse Watters Primetime [2026-06-09 00:00] 00:05",
+                "file": "https://archive.org/download/FOXNEWSW_20260609_000000_Jesse_Watters_Primetime/FOXNEWSW_20260609_000000_Jesse_Watters_Primetime.mp4?exact=1&start=300&end=600",
+                "duration": 300
+        },
+        {
+                "title": "Jesse Watters Primetime [2026-06-09 00:00] 00:10",
+                "file": "https://archive.org/download/FOXNEWSW_20260609_000000_Jesse_Watters_Primetime/FOXNEWSW_20260609_000000_Jesse_Watters_Primetime.mp4?exact=1&start=600&end=900",
+                "duration": 300
+        },
+        {
+                "title": "Jesse Watters Primetime [2026-06-09 00:00] 00:15",
+                "file": "https://archive.org/download/FOXNEWSW_20260609_000000_Jesse_Watters_Primetime/FOXNEWSW_20260609_000000_Jesse_Watters_Primetime.mp4?exact=1&start=900&end=1200",
+                "duration": 300
+        },
+        {
+                "title": "Jesse Watters Primetime [2026-06-09 00:00] 00:20",
+                "file": "https://archive.org/download/FOXNEWSW_20260609_000000_Jesse_Watters_Primetime/FOXNEWSW_20260609_000000_Jesse_Watters_Primetime.mp4?exact=1&start=1200&end=1500",
+                "duration": 300
+        },
+        {
+                "title": "Jesse Watters Primetime [2026-06-09 00:00] 00:25",
+                "file": "https://archive.org/download/FOXNEWSW_20260609_000000_Jesse_Watters_Primetime/FOXNEWSW_20260609_000000_Jesse_Watters_Primetime.mp4?exact=1&start=1500&end=1800",
+                "duration": 300
+        },
+        {
+                "title": "Jesse Watters Primetime [2026-06-09 00:00] 00:30",
+                "file": "https://archive.org/download/FOXNEWSW_20260609_000000_Jesse_Watters_Primetime/FOXNEWSW_20260609_000000_Jesse_Watters_Primetime.mp4?exact=1&start=1800&end=2100",
+                "duration": 300
+        },
+        {
+                "title": "Jesse Watters Primetime [2026-06-09 00:00] 00:35",
+                "file": "https://archive.org/download/FOXNEWSW_20260609_000000_Jesse_Watters_Primetime/FOXNEWSW_20260609_000000_Jesse_Watters_Primetime.mp4?exact=1&start=2100&end=2400",
+                "duration": 300
+        },
+        {
+                "title": "Jesse Watters Primetime [2026-06-09 00:00] 00:40",
+                "file": "https://archive.org/download/FOXNEWSW_20260609_000000_Jesse_Watters_Primetime/FOXNEWSW_20260609_000000_Jesse_Watters_Primetime.mp4?exact=1&start=2400&end=2700",
+                "duration": 300
+        },
+        {
+                "title": "Jesse Watters Primetime [2026-06-09 00:00] 00:45",
+                "file": "https://archive.org/download/FOXNEWSW_20260609_000000_Jesse_Watters_Primetime/FOXNEWSW_20260609_000000_Jesse_Watters_Primetime.mp4?exact=1&start=2700&end=3000",
+                "duration": 300
+        },
+        {
+                "title": "Jesse Watters Primetime [2026-06-09 00:00] 00:50",
+                "file": "https://archive.org/download/FOXNEWSW_20260609_000000_Jesse_Watters_Primetime/FOXNEWSW_20260609_000000_Jesse_Watters_Primetime.mp4?exact=1&start=3000&end=3300",
+                "duration": 300
+        },
+        {
+                "title": "Jesse Watters Primetime [2026-06-09 00:00] 00:55",
+                "file": "https://archive.org/download/FOXNEWSW_20260609_000000_Jesse_Watters_Primetime/FOXNEWSW_20260609_000000_Jesse_Watters_Primetime.mp4?exact=1&start=3300&end=3600",
+                "duration": 300
+        },
+        {
+                "title": "The Situation Room [2026-06-09 15:00] 00:00",
+                "file": "https://archive.org/download/CNNW_20260609_150000_The_Situation_Room/CNNW_20260609_150000_The_Situation_Room.mp4?exact=1&start=0&end=300",
+                "duration": 300
+        },
+        {
+                "title": "The Situation Room [2026-06-09 15:00] 00:05",
+                "file": "https://archive.org/download/CNNW_20260609_150000_The_Situation_Room/CNNW_20260609_150000_The_Situation_Room.mp4?exact=1&start=300&end=600",
+                "duration": 300
+        },
+        {
+                "title": "The Situation Room [2026-06-09 15:00] 00:10",
+                "file": "https://archive.org/download/CNNW_20260609_150000_The_Situation_Room/CNNW_20260609_150000_The_Situation_Room.mp4?exact=1&start=600&end=900",
+                "duration": 300
+        },
+        {
+                "title": "The Situation Room [2026-06-09 15:00] 00:15",
+                "file": "https://archive.org/download/CNNW_20260609_150000_The_Situation_Room/CNNW_20260609_150000_The_Situation_Room.mp4?exact=1&start=900&end=1200",
+                "duration": 300
+        },
+        {
+                "title": "The Situation Room [2026-06-09 15:00] 00:20",
+                "file": "https://archive.org/download/CNNW_20260609_150000_The_Situation_Room/CNNW_20260609_150000_The_Situation_Room.mp4?exact=1&start=1200&end=1500",
+                "duration": 300
+        },
+        {
+                "title": "The Situation Room [2026-06-09 15:00] 00:25",
+                "file": "https://archive.org/download/CNNW_20260609_150000_The_Situation_Room/CNNW_20260609_150000_The_Situation_Room.mp4?exact=1&start=1500&end=1800",
+                "duration": 300
+        },
+        {
+                "title": "The Situation Room [2026-06-09 15:00] 00:30",
+                "file": "https://archive.org/download/CNNW_20260609_150000_The_Situation_Room/CNNW_20260609_150000_The_Situation_Room.mp4?exact=1&start=1800&end=2100",
+                "duration": 300
+        },
+        {
+                "title": "The Situation Room [2026-06-09 15:00] 00:35",
+                "file": "https://archive.org/download/CNNW_20260609_150000_The_Situation_Room/CNNW_20260609_150000_The_Situation_Room.mp4?exact=1&start=2100&end=2400",
+                "duration": 300
+        },
+        {
+                "title": "The Situation Room [2026-06-09 15:00] 00:40",
+                "file": "https://archive.org/download/CNNW_20260609_150000_The_Situation_Room/CNNW_20260609_150000_The_Situation_Room.mp4?exact=1&start=2400&end=2700",
+                "duration": 300
+        },
+        {
+                "title": "The Situation Room [2026-06-09 15:00] 00:45",
+                "file": "https://archive.org/download/CNNW_20260609_150000_The_Situation_Room/CNNW_20260609_150000_The_Situation_Room.mp4?exact=1&start=2700&end=3000",
+                "duration": 300
+        },
+        {
+                "title": "The Situation Room [2026-06-09 15:00] 00:50",
+                "file": "https://archive.org/download/CNNW_20260609_150000_The_Situation_Room/CNNW_20260609_150000_The_Situation_Room.mp4?exact=1&start=3000&end=3300",
+                "duration": 300
+        },
+        {
+                "title": "The Situation Room [2026-06-09 15:00] 00:55",
+                "file": "https://archive.org/download/CNNW_20260609_150000_The_Situation_Room/CNNW_20260609_150000_The_Situation_Room.mp4?exact=1&start=3300&end=3600",
+                "duration": 300
+        },
+        {
+                "title": "The Situation Room [2026-06-09 14:00] 00:00",
+                "file": "https://archive.org/download/CNNW_20260609_140000_The_Situation_Room/CNNW_20260609_140000_The_Situation_Room.mp4?exact=1&start=0&end=300",
+                "duration": 300
+        },
+        {
+                "title": "The Situation Room [2026-06-09 14:00] 00:05",
+                "file": "https://archive.org/download/CNNW_20260609_140000_The_Situation_Room/CNNW_20260609_140000_The_Situation_Room.mp4?exact=1&start=300&end=600",
+                "duration": 300
+        },
+        {
+                "title": "The Situation Room [2026-06-09 14:00] 00:10",
+                "file": "https://archive.org/download/CNNW_20260609_140000_The_Situation_Room/CNNW_20260609_140000_The_Situation_Room.mp4?exact=1&start=600&end=900",
+                "duration": 300
+        },
+        {
+                "title": "The Situation Room [2026-06-09 14:00] 00:15",
+                "file": "https://archive.org/download/CNNW_20260609_140000_The_Situation_Room/CNNW_20260609_140000_The_Situation_Room.mp4?exact=1&start=900&end=1200",
+                "duration": 300
+        },
+        {
+                "title": "The Situation Room [2026-06-09 14:00] 00:20",
+                "file": "https://archive.org/download/CNNW_20260609_140000_The_Situation_Room/CNNW_20260609_140000_The_Situation_Room.mp4?exact=1&start=1200&end=1500",
+                "duration": 300
+        },
+        {
+                "title": "The Situation Room [2026-06-09 14:00] 00:25",
+                "file": "https://archive.org/download/CNNW_20260609_140000_The_Situation_Room/CNNW_20260609_140000_The_Situation_Room.mp4?exact=1&start=1500&end=1800",
+                "duration": 300
+        },
+        {
+                "title": "The Situation Room [2026-06-09 14:00] 00:30",
+                "file": "https://archive.org/download/CNNW_20260609_140000_The_Situation_Room/CNNW_20260609_140000_The_Situation_Room.mp4?exact=1&start=1800&end=2100",
+                "duration": 300
+        },
+        {
+                "title": "The Situation Room [2026-06-09 14:00] 00:35",
+                "file": "https://archive.org/download/CNNW_20260609_140000_The_Situation_Room/CNNW_20260609_140000_The_Situation_Room.mp4?exact=1&start=2100&end=2400",
+                "duration": 300
+        },
+        {
+                "title": "The Situation Room [2026-06-09 14:00] 00:40",
+                "file": "https://archive.org/download/CNNW_20260609_140000_The_Situation_Room/CNNW_20260609_140000_The_Situation_Room.mp4?exact=1&start=2400&end=2700",
+                "duration": 300
+        },
+        {
+                "title": "Shift [2026-06-09 12:45] 00:00",
+                "file": "https://archive.org/download/DW_20260609_124500_Shift/DW_20260609_124500_Shift.mp4?exact=1&start=0&end=300",
+                "duration": 300
+        },
+        {
+                "title": "The Situation Room [2026-06-09 14:00] 00:45",
+                "file": "https://archive.org/download/CNNW_20260609_140000_The_Situation_Room/CNNW_20260609_140000_The_Situation_Room.mp4?exact=1&start=2700&end=3000",
+                "duration": 300
+        },
+        {
+                "title": "The Situation Room [2026-06-09 14:00] 00:50",
+                "file": "https://archive.org/download/CNNW_20260609_140000_The_Situation_Room/CNNW_20260609_140000_The_Situation_Room.mp4?exact=1&start=3000&end=3300",
+                "duration": 300
+        },
+        {
+                "title": "The Situation Room [2026-06-09 14:00] 00:55",
+                "file": "https://archive.org/download/CNNW_20260609_140000_The_Situation_Room/CNNW_20260609_140000_The_Situation_Room.mp4?exact=1&start=3300&end=3600",
+                "duration": 300
+        },
+        {
+                "title": "CNN News Central [2026-06-09 13:00] 00:00",
+                "file": "https://archive.org/download/CNNW_20260609_130000_CNN_News_Central/CNNW_20260609_130000_CNN_News_Central.mp4?exact=1&start=0&end=300",
+                "duration": 300
+        },
+        {
+                "title": "CNN News Central [2026-06-09 13:00] 00:05",
+                "file": "https://archive.org/download/CNNW_20260609_130000_CNN_News_Central/CNNW_20260609_130000_CNN_News_Central.mp4?exact=1&start=300&end=600",
+                "duration": 300
+        },
+        {
+                "title": "CNN News Central [2026-06-09 13:00] 00:10",
+                "file": "https://archive.org/download/CNNW_20260609_130000_CNN_News_Central/CNNW_20260609_130000_CNN_News_Central.mp4?exact=1&start=600&end=900",
+                "duration": 300
+        },
+        {
+                "title": "CNN News Central [2026-06-09 13:00] 00:15",
+                "file": "https://archive.org/download/CNNW_20260609_130000_CNN_News_Central/CNNW_20260609_130000_CNN_News_Central.mp4?exact=1&start=900&end=1200",
+                "duration": 300
+        },
+        {
+                "title": "CNN News Central [2026-06-09 13:00] 00:20",
+                "file": "https://archive.org/download/CNNW_20260609_130000_CNN_News_Central/CNNW_20260609_130000_CNN_News_Central.mp4?exact=1&start=1200&end=1500",
+                "duration": 300
+        },
+        {
+                "title": "CNN News Central [2026-06-09 13:00] 00:25",
+                "file": "https://archive.org/download/CNNW_20260609_130000_CNN_News_Central/CNNW_20260609_130000_CNN_News_Central.mp4?exact=1&start=1500&end=1800",
+                "duration": 300
+        },
+        {
+                "title": "CNN This Morning [2026-06-09 10:00] 00:00",
+                "file": "https://archive.org/download/CNNW_20260609_100000_CNN_This_Morning/CNNW_20260609_100000_CNN_This_Morning.mp4?exact=1&start=0&end=300",
+                "duration": 300
+        },
+        {
+                "title": "CNN News Central [2026-06-09 13:00] 00:30",
+                "file": "https://archive.org/download/CNNW_20260609_130000_CNN_News_Central/CNNW_20260609_130000_CNN_News_Central.mp4?exact=1&start=1800&end=2100",
+                "duration": 300
+        },
+        {
+                "title": "CNN News Central [2026-06-09 13:00] 00:35",
+                "file": "https://archive.org/download/CNNW_20260609_130000_CNN_News_Central/CNNW_20260609_130000_CNN_News_Central.mp4?exact=1&start=2100&end=2400",
+                "duration": 300
+        },
+        {
+                "title": "CNN News Central [2026-06-09 13:00] 00:40",
+                "file": "https://archive.org/download/CNNW_20260609_130000_CNN_News_Central/CNNW_20260609_130000_CNN_News_Central.mp4?exact=1&start=2400&end=2700",
+                "duration": 300
+        },
+        {
+                "title": "CNN News Central [2026-06-09 13:00] 00:45",
+                "file": "https://archive.org/download/CNNW_20260609_130000_CNN_News_Central/CNNW_20260609_130000_CNN_News_Central.mp4?exact=1&start=2700&end=3000",
+                "duration": 300
+        },
+        {
+                "title": "CNN News Central [2026-06-09 13:00] 00:50",
+                "file": "https://archive.org/download/CNNW_20260609_130000_CNN_News_Central/CNNW_20260609_130000_CNN_News_Central.mp4?exact=1&start=3000&end=3300",
+                "duration": 300
+        },
+        {
+                "title": "CNN News Central [2026-06-09 13:00] 00:55",
+                "file": "https://archive.org/download/CNNW_20260609_130000_CNN_News_Central/CNNW_20260609_130000_CNN_News_Central.mp4?exact=1&start=3300&end=3600",
+                "duration": 300
+        },
+        {
+                "title": "CNN News Central [2026-06-09 12:00] 00:00",
+                "file": "https://archive.org/download/CNNW_20260609_120000_CNN_News_Central/CNNW_20260609_120000_CNN_News_Central.mp4?exact=1&start=0&end=300",
+                "duration": 300
+        },
+        {
+                "title": "CNN News Central [2026-06-09 12:00] 00:05",
+                "file": "https://archive.org/download/CNNW_20260609_120000_CNN_News_Central/CNNW_20260609_120000_CNN_News_Central.mp4?exact=1&start=300&end=600",
+                "duration": 300
+        },
+        {
+                "title": "CNN News Central [2026-06-09 12:00] 00:10",
+                "file": "https://archive.org/download/CNNW_20260609_120000_CNN_News_Central/CNNW_20260609_120000_CNN_News_Central.mp4?exact=1&start=600&end=900",
+                "duration": 300
+        },
+        {
+                "title": "CNN News Central [2026-06-09 12:00] 00:15",
+                "file": "https://archive.org/download/CNNW_20260609_120000_CNN_News_Central/CNNW_20260609_120000_CNN_News_Central.mp4?exact=1&start=900&end=1200",
+                "duration": 300
+        },
+        {
+                "title": "CNN News Central [2026-06-09 12:00] 00:20",
+                "file": "https://archive.org/download/CNNW_20260609_120000_CNN_News_Central/CNNW_20260609_120000_CNN_News_Central.mp4?exact=1&start=1200&end=1500",
+                "duration": 300
+        },
+        {
+                "title": "CNN News Central [2026-06-09 12:00] 00:25",
+                "file": "https://archive.org/download/CNNW_20260609_120000_CNN_News_Central/CNNW_20260609_120000_CNN_News_Central.mp4?exact=1&start=1500&end=1800",
+                "duration": 300
+        },
+        {
+                "title": "CNN News Central [2026-06-09 12:00] 00:30",
+                "file": "https://archive.org/download/CNNW_20260609_120000_CNN_News_Central/CNNW_20260609_120000_CNN_News_Central.mp4?exact=1&start=1800&end=2100",
+                "duration": 300
+        },
+        {
+                "title": "CNN News Central [2026-06-09 12:00] 00:35",
+                "file": "https://archive.org/download/CNNW_20260609_120000_CNN_News_Central/CNNW_20260609_120000_CNN_News_Central.mp4?exact=1&start=2100&end=2400",
+                "duration": 300
+        },
+        {
+                "title": "CNN News Central [2026-06-09 12:00] 00:40",
+                "file": "https://archive.org/download/CNNW_20260609_120000_CNN_News_Central/CNNW_20260609_120000_CNN_News_Central.mp4?exact=1&start=2400&end=2700",
+                "duration": 300
+        },
+        {
+                "title": "CNN News Central [2026-06-09 12:00] 00:45",
+                "file": "https://archive.org/download/CNNW_20260609_120000_CNN_News_Central/CNNW_20260609_120000_CNN_News_Central.mp4?exact=1&start=2700&end=3000",
+                "duration": 300
+        },
+        {
+                "title": "CNN News Central [2026-06-09 12:00] 00:50",
+                "file": "https://archive.org/download/CNNW_20260609_120000_CNN_News_Central/CNNW_20260609_120000_CNN_News_Central.mp4?exact=1&start=3000&end=3300",
+                "duration": 300
+        },
+        {
+                "title": "CNN News Central [2026-06-09 12:00] 00:55",
+                "file": "https://archive.org/download/CNNW_20260609_120000_CNN_News_Central/CNNW_20260609_120000_CNN_News_Central.mp4?exact=1&start=3300&end=3600",
+                "duration": 300
+        },
+        {
+                "title": "CNN News Central [2026-06-09 11:00] 00:00",
+                "file": "https://archive.org/download/CNNW_20260609_110000_CNN_News_Central/CNNW_20260609_110000_CNN_News_Central.mp4?exact=1&start=0&end=300",
+                "duration": 300
+        },
+        {
+                "title": "CNN News Central [2026-06-09 11:00] 00:05",
+                "file": "https://archive.org/download/CNNW_20260609_110000_CNN_News_Central/CNNW_20260609_110000_CNN_News_Central.mp4?exact=1&start=300&end=600",
+                "duration": 300
+        },
+        {
+                "title": "CNN News Central [2026-06-09 11:00] 00:10",
+                "file": "https://archive.org/download/CNNW_20260609_110000_CNN_News_Central/CNNW_20260609_110000_CNN_News_Central.mp4?exact=1&start=600&end=900",
+                "duration": 300
+        },
+        {
+                "title": "CNN News Central [2026-06-09 11:00] 00:15",
+                "file": "https://archive.org/download/CNNW_20260609_110000_CNN_News_Central/CNNW_20260609_110000_CNN_News_Central.mp4?exact=1&start=900&end=1200",
+                "duration": 300
+        },
+        {
+                "title": "CNN News Central [2026-06-09 11:00] 00:20",
+                "file": "https://archive.org/download/CNNW_20260609_110000_CNN_News_Central/CNNW_20260609_110000_CNN_News_Central.mp4?exact=1&start=1200&end=1500",
+                "duration": 300
+        },
+        {
+                "title": "CNN News Central [2026-06-09 11:00] 00:25",
+                "file": "https://archive.org/download/CNNW_20260609_110000_CNN_News_Central/CNNW_20260609_110000_CNN_News_Central.mp4?exact=1&start=1500&end=1800",
+                "duration": 300
+        },
+        {
+                "title": "CNN News Central [2026-06-09 11:00] 00:30",
+                "file": "https://archive.org/download/CNNW_20260609_110000_CNN_News_Central/CNNW_20260609_110000_CNN_News_Central.mp4?exact=1&start=1800&end=2100",
+                "duration": 300
+        },
+        {
+                "title": "CNN News Central [2026-06-09 11:00] 00:35",
+                "file": "https://archive.org/download/CNNW_20260609_110000_CNN_News_Central/CNNW_20260609_110000_CNN_News_Central.mp4?exact=1&start=2100&end=2400",
+                "duration": 300
+        },
+        {
+                "title": "CNN News Central [2026-06-09 11:00] 00:40",
+                "file": "https://archive.org/download/CNNW_20260609_110000_CNN_News_Central/CNNW_20260609_110000_CNN_News_Central.mp4?exact=1&start=2400&end=2700",
+                "duration": 300
+        },
+        {
+                "title": "CNN News Central [2026-06-09 11:00] 00:45",
+                "file": "https://archive.org/download/CNNW_20260609_110000_CNN_News_Central/CNNW_20260609_110000_CNN_News_Central.mp4?exact=1&start=2700&end=3000",
+                "duration": 300
+        },
+        {
+                "title": "CNN News Central [2026-06-09 11:00] 00:50",
+                "file": "https://archive.org/download/CNNW_20260609_110000_CNN_News_Central/CNNW_20260609_110000_CNN_News_Central.mp4?exact=1&start=3000&end=3300",
+                "duration": 300
+        },
+        {
+                "title": "CNN News Central [2026-06-09 11:00] 00:55",
+                "file": "https://archive.org/download/CNNW_20260609_110000_CNN_News_Central/CNNW_20260609_110000_CNN_News_Central.mp4?exact=1&start=3300&end=3600",
+                "duration": 300
+        },
+        {
+                "title": "CNN This Morning [2026-06-09 10:00] 00:05",
+                "file": "https://archive.org/download/CNNW_20260609_100000_CNN_This_Morning/CNNW_20260609_100000_CNN_This_Morning.mp4?exact=1&start=300&end=600",
+                "duration": 300
+        },
+        {
+                "title": "CNN This Morning [2026-06-09 10:00] 00:10",
+                "file": "https://archive.org/download/CNNW_20260609_100000_CNN_This_Morning/CNNW_20260609_100000_CNN_This_Morning.mp4?exact=1&start=600&end=900",
+                "duration": 300
+        },
+        {
+                "title": "CNN This Morning [2026-06-09 10:00] 00:15",
+                "file": "https://archive.org/download/CNNW_20260609_100000_CNN_This_Morning/CNNW_20260609_100000_CNN_This_Morning.mp4?exact=1&start=900&end=1200",
+                "duration": 300
+        },
+        {
+                "title": "CNN This Morning [2026-06-09 10:00] 00:20",
+                "file": "https://archive.org/download/CNNW_20260609_100000_CNN_This_Morning/CNNW_20260609_100000_CNN_This_Morning.mp4?exact=1&start=1200&end=1500",
+                "duration": 300
+        },
+        {
+                "title": "CNN This Morning [2026-06-09 10:00] 00:25",
+                "file": "https://archive.org/download/CNNW_20260609_100000_CNN_This_Morning/CNNW_20260609_100000_CNN_This_Morning.mp4?exact=1&start=1500&end=1800",
+                "duration": 300
+        },
+        {
+                "title": "CNN This Morning [2026-06-09 10:00] 00:30",
+                "file": "https://archive.org/download/CNNW_20260609_100000_CNN_This_Morning/CNNW_20260609_100000_CNN_This_Morning.mp4?exact=1&start=1800&end=2100",
+                "duration": 300
+        },
+        {
+                "title": "CNN This Morning [2026-06-09 10:00] 00:35",
+                "file": "https://archive.org/download/CNNW_20260609_100000_CNN_This_Morning/CNNW_20260609_100000_CNN_This_Morning.mp4?exact=1&start=2100&end=2400",
+                "duration": 300
+        },
+        {
+                "title": "CNN This Morning [2026-06-09 10:00] 00:40",
+                "file": "https://archive.org/download/CNNW_20260609_100000_CNN_This_Morning/CNNW_20260609_100000_CNN_This_Morning.mp4?exact=1&start=2400&end=2700",
+                "duration": 300
+        },
+        {
+                "title": "CNN This Morning [2026-06-09 10:00] 00:45",
+                "file": "https://archive.org/download/CNNW_20260609_100000_CNN_This_Morning/CNNW_20260609_100000_CNN_This_Morning.mp4?exact=1&start=2700&end=3000",
+                "duration": 300
+        },
+        {
+                "title": "CNN This Morning [2026-06-09 10:00] 00:50",
+                "file": "https://archive.org/download/CNNW_20260609_100000_CNN_This_Morning/CNNW_20260609_100000_CNN_This_Morning.mp4?exact=1&start=3000&end=3300",
+                "duration": 300
+        },
+        {
+                "title": "CNN This Morning [2026-06-09 10:00] 00:55",
+                "file": "https://archive.org/download/CNNW_20260609_100000_CNN_This_Morning/CNNW_20260609_100000_CNN_This_Morning.mp4?exact=1&start=3300&end=3600",
+                "duration": 300
+        },
+        {
+                "title": "Shift [2026-06-09 12:45] 00:05",
+                "file": "https://archive.org/download/DW_20260609_124500_Shift/DW_20260609_124500_Shift.mp4?exact=1&start=300&end=600",
+                "duration": 300
+        },
+        {
+                "title": "CNN Headline Express [2026-06-09 09:00] 00:00",
+                "file": "https://archive.org/download/CNNW_20260609_090000_CNN_Headline_Express/CNNW_20260609_090000_CNN_Headline_Express.mp4?exact=1&start=0&end=300",
+                "duration": 300
+        },
+        {
+                "title": "CNN Headline Express [2026-06-09 09:00] 00:05",
+                "file": "https://archive.org/download/CNNW_20260609_090000_CNN_Headline_Express/CNNW_20260609_090000_CNN_Headline_Express.mp4?exact=1&start=300&end=600",
+                "duration": 300
+        },
+        {
+                "title": "CNN Headline Express [2026-06-09 09:00] 00:10",
+                "file": "https://archive.org/download/CNNW_20260609_090000_CNN_Headline_Express/CNNW_20260609_090000_CNN_Headline_Express.mp4?exact=1&start=600&end=900",
+                "duration": 300
+        },
+        {
+                "title": "CNN Headline Express [2026-06-09 09:00] 00:15",
+                "file": "https://archive.org/download/CNNW_20260609_090000_CNN_Headline_Express/CNNW_20260609_090000_CNN_Headline_Express.mp4?exact=1&start=900&end=1200",
+                "duration": 300
+        },
+        {
+                "title": "CNN Headline Express [2026-06-09 09:00] 00:20",
+                "file": "https://archive.org/download/CNNW_20260609_090000_CNN_Headline_Express/CNNW_20260609_090000_CNN_Headline_Express.mp4?exact=1&start=1200&end=1500",
+                "duration": 300
+        },
+        {
+                "title": "CNN Headline Express [2026-06-09 09:00] 00:25",
+                "file": "https://archive.org/download/CNNW_20260609_090000_CNN_Headline_Express/CNNW_20260609_090000_CNN_Headline_Express.mp4?exact=1&start=1500&end=1800",
+                "duration": 300
+        },
+        {
+                "title": "CNN Headline Express [2026-06-09 09:00] 00:30",
+                "file": "https://archive.org/download/CNNW_20260609_090000_CNN_Headline_Express/CNNW_20260609_090000_CNN_Headline_Express.mp4?exact=1&start=1800&end=2100",
+                "duration": 300
+        },
+        {
+                "title": "CNN Headline Express [2026-06-09 09:00] 00:35",
+                "file": "https://archive.org/download/CNNW_20260609_090000_CNN_Headline_Express/CNNW_20260609_090000_CNN_Headline_Express.mp4?exact=1&start=2100&end=2400",
+                "duration": 300
+        },
+        {
+                "title": "CNN Headline Express [2026-06-09 09:00] 00:40",
+                "file": "https://archive.org/download/CNNW_20260609_090000_CNN_Headline_Express/CNNW_20260609_090000_CNN_Headline_Express.mp4?exact=1&start=2400&end=2700",
+                "duration": 300
+        },
+        {
+                "title": "CNN Headline Express [2026-06-09 09:00] 00:45",
+                "file": "https://archive.org/download/CNNW_20260609_090000_CNN_Headline_Express/CNNW_20260609_090000_CNN_Headline_Express.mp4?exact=1&start=2700&end=3000",
+                "duration": 300
+        },
+        {
+                "title": "CNN Headline Express [2026-06-09 09:00] 00:50",
+                "file": "https://archive.org/download/CNNW_20260609_090000_CNN_Headline_Express/CNNW_20260609_090000_CNN_Headline_Express.mp4?exact=1&start=3000&end=3300",
+                "duration": 300
+        },
+        {
+                "title": "CNN Headline Express [2026-06-09 09:00] 00:55",
+                "file": "https://archive.org/download/CNNW_20260609_090000_CNN_Headline_Express/CNNW_20260609_090000_CNN_Headline_Express.mp4?exact=1&start=3300&end=3600",
+                "duration": 300
+        },
+        {
+                "title": "CNN Newsroom Live [2026-06-09 08:00] 00:00",
+                "file": "https://archive.org/download/CNNW_20260609_080000_CNN_Newsroom_Live/CNNW_20260609_080000_CNN_Newsroom_Live.mp4?exact=1&start=0&end=300",
+                "duration": 300
+        },
+        {
+                "title": "CNN Newsroom Live [2026-06-09 08:00] 00:05",
+                "file": "https://archive.org/download/CNNW_20260609_080000_CNN_Newsroom_Live/CNNW_20260609_080000_CNN_Newsroom_Live.mp4?exact=1&start=300&end=600",
+                "duration": 300
+        },
+        {
+                "title": "CNN Newsroom Live [2026-06-09 08:00] 00:10",
+                "file": "https://archive.org/download/CNNW_20260609_080000_CNN_Newsroom_Live/CNNW_20260609_080000_CNN_Newsroom_Live.mp4?exact=1&start=600&end=900",
+                "duration": 300
+        },
+        {
+                "title": "CNN Newsroom Live [2026-06-09 08:00] 00:15",
+                "file": "https://archive.org/download/CNNW_20260609_080000_CNN_Newsroom_Live/CNNW_20260609_080000_CNN_Newsroom_Live.mp4?exact=1&start=900&end=1200",
+                "duration": 300
+        },
+        {
+                "title": "CNN Newsroom Live [2026-06-09 08:00] 00:20",
+                "file": "https://archive.org/download/CNNW_20260609_080000_CNN_Newsroom_Live/CNNW_20260609_080000_CNN_Newsroom_Live.mp4?exact=1&start=1200&end=1500",
+                "duration": 300
+        },
+        {
+                "title": "CNN Newsroom Live [2026-06-09 08:00] 00:25",
+                "file": "https://archive.org/download/CNNW_20260609_080000_CNN_Newsroom_Live/CNNW_20260609_080000_CNN_Newsroom_Live.mp4?exact=1&start=1500&end=1800",
+                "duration": 300
+        },
+        {
+                "title": "CNN Newsroom Live [2026-06-09 08:00] 00:30",
+                "file": "https://archive.org/download/CNNW_20260609_080000_CNN_Newsroom_Live/CNNW_20260609_080000_CNN_Newsroom_Live.mp4?exact=1&start=1800&end=2100",
+                "duration": 300
+        },
+        {
+                "title": "CNN Newsroom Live [2026-06-09 08:00] 00:35",
+                "file": "https://archive.org/download/CNNW_20260609_080000_CNN_Newsroom_Live/CNNW_20260609_080000_CNN_Newsroom_Live.mp4?exact=1&start=2100&end=2400",
+                "duration": 300
+        },
+        {
+                "title": "CNN Newsroom Live [2026-06-09 08:00] 00:40",
+                "file": "https://archive.org/download/CNNW_20260609_080000_CNN_Newsroom_Live/CNNW_20260609_080000_CNN_Newsroom_Live.mp4?exact=1&start=2400&end=2700",
+                "duration": 300
+        },
+        {
+                "title": "CNN Newsroom Live [2026-06-09 08:00] 00:45",
+                "file": "https://archive.org/download/CNNW_20260609_080000_CNN_Newsroom_Live/CNNW_20260609_080000_CNN_Newsroom_Live.mp4?exact=1&start=2700&end=3000",
+                "duration": 300
+        },
+        {
+                "title": "CNN Newsroom Live [2026-06-09 08:00] 00:50",
+                "file": "https://archive.org/download/CNNW_20260609_080000_CNN_Newsroom_Live/CNNW_20260609_080000_CNN_Newsroom_Live.mp4?exact=1&start=3000&end=3300",
+                "duration": 300
+        },
+        {
+                "title": "CNN Newsroom Live [2026-06-09 08:00] 00:55",
+                "file": "https://archive.org/download/CNNW_20260609_080000_CNN_Newsroom_Live/CNNW_20260609_080000_CNN_Newsroom_Live.mp4?exact=1&start=3300&end=3600",
+                "duration": 300
+        },
+        {
+                "title": "CNN NewsNight With Abby Phillip [2026-06-09 07:00] 00:00",
+                "file": "https://archive.org/download/CNNW_20260609_070000_CNN_NewsNight_With_Abby_Phillip/CNNW_20260609_070000_CNN_NewsNight_With_Abby_Phillip.mp4?exact=1&start=0&end=300",
+                "duration": 300
+        },
+        {
+                "title": "CNN NewsNight With Abby Phillip [2026-06-09 07:00] 00:05",
+                "file": "https://archive.org/download/CNNW_20260609_070000_CNN_NewsNight_With_Abby_Phillip/CNNW_20260609_070000_CNN_NewsNight_With_Abby_Phillip.mp4?exact=1&start=300&end=600",
+                "duration": 300
+        },
+        {
+                "title": "CNN NewsNight With Abby Phillip [2026-06-09 07:00] 00:10",
+                "file": "https://archive.org/download/CNNW_20260609_070000_CNN_NewsNight_With_Abby_Phillip/CNNW_20260609_070000_CNN_NewsNight_With_Abby_Phillip.mp4?exact=1&start=600&end=900",
+                "duration": 300
+        },
+        {
+                "title": "CNN NewsNight With Abby Phillip [2026-06-09 07:00] 00:15",
+                "file": "https://archive.org/download/CNNW_20260609_070000_CNN_NewsNight_With_Abby_Phillip/CNNW_20260609_070000_CNN_NewsNight_With_Abby_Phillip.mp4?exact=1&start=900&end=1200",
+                "duration": 300
+        },
+        {
+                "title": "CNN NewsNight With Abby Phillip [2026-06-09 07:00] 00:20",
+                "file": "https://archive.org/download/CNNW_20260609_070000_CNN_NewsNight_With_Abby_Phillip/CNNW_20260609_070000_CNN_NewsNight_With_Abby_Phillip.mp4?exact=1&start=1200&end=1500",
+                "duration": 300
+        },
+        {
+                "title": "CNN NewsNight With Abby Phillip [2026-06-09 07:00] 00:25",
+                "file": "https://archive.org/download/CNNW_20260609_070000_CNN_NewsNight_With_Abby_Phillip/CNNW_20260609_070000_CNN_NewsNight_With_Abby_Phillip.mp4?exact=1&start=1500&end=1800",
+                "duration": 300
+        },
+        {
+                "title": "CNN NewsNight With Abby Phillip [2026-06-09 07:00] 00:30",
+                "file": "https://archive.org/download/CNNW_20260609_070000_CNN_NewsNight_With_Abby_Phillip/CNNW_20260609_070000_CNN_NewsNight_With_Abby_Phillip.mp4?exact=1&start=1800&end=2100",
+                "duration": 300
+        },
+        {
+                "title": "CNN NewsNight With Abby Phillip [2026-06-09 07:00] 00:35",
+                "file": "https://archive.org/download/CNNW_20260609_070000_CNN_NewsNight_With_Abby_Phillip/CNNW_20260609_070000_CNN_NewsNight_With_Abby_Phillip.mp4?exact=1&start=2100&end=2400",
+                "duration": 300
+        },
+        {
+                "title": "CNN NewsNight With Abby Phillip [2026-06-09 07:00] 00:40",
+                "file": "https://archive.org/download/CNNW_20260609_070000_CNN_NewsNight_With_Abby_Phillip/CNNW_20260609_070000_CNN_NewsNight_With_Abby_Phillip.mp4?exact=1&start=2400&end=2700",
+                "duration": 300
+        },
+        {
+                "title": "CNN NewsNight With Abby Phillip [2026-06-09 07:00] 00:45",
+                "file": "https://archive.org/download/CNNW_20260609_070000_CNN_NewsNight_With_Abby_Phillip/CNNW_20260609_070000_CNN_NewsNight_With_Abby_Phillip.mp4?exact=1&start=2700&end=3000",
+                "duration": 300
+        },
+        {
+                "title": "CNN NewsNight With Abby Phillip [2026-06-09 07:00] 00:50",
+                "file": "https://archive.org/download/CNNW_20260609_070000_CNN_NewsNight_With_Abby_Phillip/CNNW_20260609_070000_CNN_NewsNight_With_Abby_Phillip.mp4?exact=1&start=3000&end=3300",
+                "duration": 300
+        },
+        {
+                "title": "CNN NewsNight With Abby Phillip [2026-06-09 07:00] 00:55",
+                "file": "https://archive.org/download/CNNW_20260609_070000_CNN_NewsNight_With_Abby_Phillip/CNNW_20260609_070000_CNN_NewsNight_With_Abby_Phillip.mp4?exact=1&start=3300&end=3600",
+                "duration": 300
+        },
+        {
+                "title": "Anderson Cooper 360 [2026-06-09 06:00] 00:00",
+                "file": "https://archive.org/download/CNNW_20260609_060000_Anderson_Cooper_360/CNNW_20260609_060000_Anderson_Cooper_360.mp4?exact=1&start=0&end=300",
+                "duration": 300
+        },
+        {
+                "title": "Anderson Cooper 360 [2026-06-09 06:00] 00:05",
+                "file": "https://archive.org/download/CNNW_20260609_060000_Anderson_Cooper_360/CNNW_20260609_060000_Anderson_Cooper_360.mp4?exact=1&start=300&end=600",
+                "duration": 300
+        },
+        {
+                "title": "Anderson Cooper 360 [2026-06-09 06:00] 00:10",
+                "file": "https://archive.org/download/CNNW_20260609_060000_Anderson_Cooper_360/CNNW_20260609_060000_Anderson_Cooper_360.mp4?exact=1&start=600&end=900",
+                "duration": 300
+        },
+        {
+                "title": "Anderson Cooper 360 [2026-06-09 06:00] 00:15",
+                "file": "https://archive.org/download/CNNW_20260609_060000_Anderson_Cooper_360/CNNW_20260609_060000_Anderson_Cooper_360.mp4?exact=1&start=900&end=1200",
+                "duration": 300
+        },
+        {
+                "title": "Anderson Cooper 360 [2026-06-09 06:00] 00:20",
+                "file": "https://archive.org/download/CNNW_20260609_060000_Anderson_Cooper_360/CNNW_20260609_060000_Anderson_Cooper_360.mp4?exact=1&start=1200&end=1500",
+                "duration": 300
+        },
+        {
+                "title": "Anderson Cooper 360 [2026-06-09 06:00] 00:25",
+                "file": "https://archive.org/download/CNNW_20260609_060000_Anderson_Cooper_360/CNNW_20260609_060000_Anderson_Cooper_360.mp4?exact=1&start=1500&end=1800",
+                "duration": 300
+        },
+        {
+                "title": "Anderson Cooper 360 [2026-06-09 06:00] 00:30",
+                "file": "https://archive.org/download/CNNW_20260609_060000_Anderson_Cooper_360/CNNW_20260609_060000_Anderson_Cooper_360.mp4?exact=1&start=1800&end=2100",
+                "duration": 300
+        },
+        {
+                "title": "Anderson Cooper 360 [2026-06-09 06:00] 00:35",
+                "file": "https://archive.org/download/CNNW_20260609_060000_Anderson_Cooper_360/CNNW_20260609_060000_Anderson_Cooper_360.mp4?exact=1&start=2100&end=2400",
+                "duration": 300
+        },
+        {
+                "title": "Anderson Cooper 360 [2026-06-09 06:00] 00:40",
+                "file": "https://archive.org/download/CNNW_20260609_060000_Anderson_Cooper_360/CNNW_20260609_060000_Anderson_Cooper_360.mp4?exact=1&start=2400&end=2700",
+                "duration": 300
+        },
+        {
+                "title": "Anderson Cooper 360 [2026-06-09 06:00] 00:45",
+                "file": "https://archive.org/download/CNNW_20260609_060000_Anderson_Cooper_360/CNNW_20260609_060000_Anderson_Cooper_360.mp4?exact=1&start=2700&end=3000",
+                "duration": 300
+        },
+        {
+                "title": "Anderson Cooper 360 [2026-06-09 06:00] 00:50",
+                "file": "https://archive.org/download/CNNW_20260609_060000_Anderson_Cooper_360/CNNW_20260609_060000_Anderson_Cooper_360.mp4?exact=1&start=3000&end=3300",
+                "duration": 300
+        },
+        {
+                "title": "Anderson Cooper 360 [2026-06-09 06:00] 00:55",
+                "file": "https://archive.org/download/CNNW_20260609_060000_Anderson_Cooper_360/CNNW_20260609_060000_Anderson_Cooper_360.mp4?exact=1&start=3300&end=3600",
+                "duration": 300
+        },
+        {
+                "title": "The Story Is With Elex Michaelson [2026-06-09 05:00] 00:00",
+                "file": "https://archive.org/download/CNNW_20260609_050000_The_Story_Is_With_Elex_Michaelson/CNNW_20260609_050000_The_Story_Is_With_Elex_Michaelson.mp4?exact=1&start=0&end=300",
+                "duration": 300
+        },
+        {
+                "title": "The Story Is With Elex Michaelson [2026-06-09 05:00] 00:05",
+                "file": "https://archive.org/download/CNNW_20260609_050000_The_Story_Is_With_Elex_Michaelson/CNNW_20260609_050000_The_Story_Is_With_Elex_Michaelson.mp4?exact=1&start=300&end=600",
+                "duration": 300
+        },
+        {
+                "title": "The Story Is With Elex Michaelson [2026-06-09 05:00] 00:10",
+                "file": "https://archive.org/download/CNNW_20260609_050000_The_Story_Is_With_Elex_Michaelson/CNNW_20260609_050000_The_Story_Is_With_Elex_Michaelson.mp4?exact=1&start=600&end=900",
+                "duration": 300
+        },
+        {
+                "title": "The Story Is With Elex Michaelson [2026-06-09 05:00] 00:15",
+                "file": "https://archive.org/download/CNNW_20260609_050000_The_Story_Is_With_Elex_Michaelson/CNNW_20260609_050000_The_Story_Is_With_Elex_Michaelson.mp4?exact=1&start=900&end=1200",
+                "duration": 300
+        },
+        {
+                "title": "The Story Is With Elex Michaelson [2026-06-09 05:00] 00:20",
+                "file": "https://archive.org/download/CNNW_20260609_050000_The_Story_Is_With_Elex_Michaelson/CNNW_20260609_050000_The_Story_Is_With_Elex_Michaelson.mp4?exact=1&start=1200&end=1500",
+                "duration": 300
+        },
+        {
+                "title": "The Story Is With Elex Michaelson [2026-06-09 05:00] 00:25",
+                "file": "https://archive.org/download/CNNW_20260609_050000_The_Story_Is_With_Elex_Michaelson/CNNW_20260609_050000_The_Story_Is_With_Elex_Michaelson.mp4?exact=1&start=1500&end=1800",
+                "duration": 300
+        },
+        {
+                "title": "The Story Is With Elex Michaelson [2026-06-09 05:00] 00:30",
+                "file": "https://archive.org/download/CNNW_20260609_050000_The_Story_Is_With_Elex_Michaelson/CNNW_20260609_050000_The_Story_Is_With_Elex_Michaelson.mp4?exact=1&start=1800&end=2100",
+                "duration": 300
+        },
+        {
+                "title": "The Story Is With Elex Michaelson [2026-06-09 05:00] 00:35",
+                "file": "https://archive.org/download/CNNW_20260609_050000_The_Story_Is_With_Elex_Michaelson/CNNW_20260609_050000_The_Story_Is_With_Elex_Michaelson.mp4?exact=1&start=2100&end=2400",
+                "duration": 300
+        },
+        {
+                "title": "The Story Is With Elex Michaelson [2026-06-09 05:00] 00:40",
+                "file": "https://archive.org/download/CNNW_20260609_050000_The_Story_Is_With_Elex_Michaelson/CNNW_20260609_050000_The_Story_Is_With_Elex_Michaelson.mp4?exact=1&start=2400&end=2700",
+                "duration": 300
+        },
+        {
+                "title": "The Story Is With Elex Michaelson [2026-06-09 05:00] 00:45",
+                "file": "https://archive.org/download/CNNW_20260609_050000_The_Story_Is_With_Elex_Michaelson/CNNW_20260609_050000_The_Story_Is_With_Elex_Michaelson.mp4?exact=1&start=2700&end=3000",
+                "duration": 300
+        },
+        {
+                "title": "The Story Is With Elex Michaelson [2026-06-09 05:00] 00:50",
+                "file": "https://archive.org/download/CNNW_20260609_050000_The_Story_Is_With_Elex_Michaelson/CNNW_20260609_050000_The_Story_Is_With_Elex_Michaelson.mp4?exact=1&start=3000&end=3300",
+                "duration": 300
+        },
+        {
+                "title": "The Story Is With Elex Michaelson [2026-06-09 05:00] 00:55",
+                "file": "https://archive.org/download/CNNW_20260609_050000_The_Story_Is_With_Elex_Michaelson/CNNW_20260609_050000_The_Story_Is_With_Elex_Michaelson.mp4?exact=1&start=3300&end=3600",
+                "duration": 300
+        },
+        {
+                "title": "The Story Is With Elex Michaelson [2026-06-09 04:00] 00:00",
+                "file": "https://archive.org/download/CNNW_20260609_040000_The_Story_Is_With_Elex_Michaelson/CNNW_20260609_040000_The_Story_Is_With_Elex_Michaelson.mp4?exact=1&start=0&end=300",
+                "duration": 300
+        },
+        {
+                "title": "The Story Is With Elex Michaelson [2026-06-09 04:00] 00:05",
+                "file": "https://archive.org/download/CNNW_20260609_040000_The_Story_Is_With_Elex_Michaelson/CNNW_20260609_040000_The_Story_Is_With_Elex_Michaelson.mp4?exact=1&start=300&end=600",
+                "duration": 300
+        },
+        {
+                "title": "The Story Is With Elex Michaelson [2026-06-09 04:00] 00:10",
+                "file": "https://archive.org/download/CNNW_20260609_040000_The_Story_Is_With_Elex_Michaelson/CNNW_20260609_040000_The_Story_Is_With_Elex_Michaelson.mp4?exact=1&start=600&end=900",
+                "duration": 300
+        },
+        {
+                "title": "The Story Is With Elex Michaelson [2026-06-09 04:00] 00:15",
+                "file": "https://archive.org/download/CNNW_20260609_040000_The_Story_Is_With_Elex_Michaelson/CNNW_20260609_040000_The_Story_Is_With_Elex_Michaelson.mp4?exact=1&start=900&end=1200",
+                "duration": 300
+        },
+        {
+                "title": "The Story Is With Elex Michaelson [2026-06-09 04:00] 00:20",
+                "file": "https://archive.org/download/CNNW_20260609_040000_The_Story_Is_With_Elex_Michaelson/CNNW_20260609_040000_The_Story_Is_With_Elex_Michaelson.mp4?exact=1&start=1200&end=1500",
+                "duration": 300
+        },
+        {
+                "title": "The Story Is With Elex Michaelson [2026-06-09 04:00] 00:25",
+                "file": "https://archive.org/download/CNNW_20260609_040000_The_Story_Is_With_Elex_Michaelson/CNNW_20260609_040000_The_Story_Is_With_Elex_Michaelson.mp4?exact=1&start=1500&end=1800",
+                "duration": 300
+        },
+        {
+                "title": "The Story Is With Elex Michaelson [2026-06-09 04:00] 00:30",
+                "file": "https://archive.org/download/CNNW_20260609_040000_The_Story_Is_With_Elex_Michaelson/CNNW_20260609_040000_The_Story_Is_With_Elex_Michaelson.mp4?exact=1&start=1800&end=2100",
+                "duration": 300
+        },
+        {
+                "title": "The Story Is With Elex Michaelson [2026-06-09 04:00] 00:35",
+                "file": "https://archive.org/download/CNNW_20260609_040000_The_Story_Is_With_Elex_Michaelson/CNNW_20260609_040000_The_Story_Is_With_Elex_Michaelson.mp4?exact=1&start=2100&end=2400",
+                "duration": 300
+        },
+        {
+                "title": "The Story Is With Elex Michaelson [2026-06-09 04:00] 00:40",
+                "file": "https://archive.org/download/CNNW_20260609_040000_The_Story_Is_With_Elex_Michaelson/CNNW_20260609_040000_The_Story_Is_With_Elex_Michaelson.mp4?exact=1&start=2400&end=2700",
+                "duration": 300
+        },
+        {
+                "title": "The Story Is With Elex Michaelson [2026-06-09 04:00] 00:45",
+                "file": "https://archive.org/download/CNNW_20260609_040000_The_Story_Is_With_Elex_Michaelson/CNNW_20260609_040000_The_Story_Is_With_Elex_Michaelson.mp4?exact=1&start=2700&end=3000",
+                "duration": 300
+        },
+        {
+                "title": "The Story Is With Elex Michaelson [2026-06-09 04:00] 00:50",
+                "file": "https://archive.org/download/CNNW_20260609_040000_The_Story_Is_With_Elex_Michaelson/CNNW_20260609_040000_The_Story_Is_With_Elex_Michaelson.mp4?exact=1&start=3000&end=3300",
+                "duration": 300
+        },
+        {
+                "title": "The Story Is With Elex Michaelson [2026-06-09 04:00] 00:55",
+                "file": "https://archive.org/download/CNNW_20260609_040000_The_Story_Is_With_Elex_Michaelson/CNNW_20260609_040000_The_Story_Is_With_Elex_Michaelson.mp4?exact=1&start=3300&end=3600",
+                "duration": 300
+        },
+        {
+                "title": "Laura Coates Live [2026-06-09 03:00] 00:00",
+                "file": "https://archive.org/download/CNNW_20260609_030000_Laura_Coates_Live/CNNW_20260609_030000_Laura_Coates_Live.mp4?exact=1&start=0&end=300",
+                "duration": 300
+        },
+        {
+                "title": "Laura Coates Live [2026-06-09 03:00] 00:05",
+                "file": "https://archive.org/download/CNNW_20260609_030000_Laura_Coates_Live/CNNW_20260609_030000_Laura_Coates_Live.mp4?exact=1&start=300&end=600",
+                "duration": 300
+        },
+        {
+                "title": "Laura Coates Live [2026-06-09 03:00] 00:10",
+                "file": "https://archive.org/download/CNNW_20260609_030000_Laura_Coates_Live/CNNW_20260609_030000_Laura_Coates_Live.mp4?exact=1&start=600&end=900",
+                "duration": 300
+        },
+        {
+                "title": "Laura Coates Live [2026-06-09 03:00] 00:15",
+                "file": "https://archive.org/download/CNNW_20260609_030000_Laura_Coates_Live/CNNW_20260609_030000_Laura_Coates_Live.mp4?exact=1&start=900&end=1200",
+                "duration": 300
+        },
+        {
+                "title": "Laura Coates Live [2026-06-09 03:00] 00:20",
+                "file": "https://archive.org/download/CNNW_20260609_030000_Laura_Coates_Live/CNNW_20260609_030000_Laura_Coates_Live.mp4?exact=1&start=1200&end=1500",
+                "duration": 300
+        },
+        {
+                "title": "Laura Coates Live [2026-06-09 03:00] 00:25",
+                "file": "https://archive.org/download/CNNW_20260609_030000_Laura_Coates_Live/CNNW_20260609_030000_Laura_Coates_Live.mp4?exact=1&start=1500&end=1800",
+                "duration": 300
+        },
+        {
+                "title": "Laura Coates Live [2026-06-09 03:00] 00:30",
+                "file": "https://archive.org/download/CNNW_20260609_030000_Laura_Coates_Live/CNNW_20260609_030000_Laura_Coates_Live.mp4?exact=1&start=1800&end=2100",
+                "duration": 300
+        },
+        {
+                "title": "Laura Coates Live [2026-06-09 03:00] 00:35",
+                "file": "https://archive.org/download/CNNW_20260609_030000_Laura_Coates_Live/CNNW_20260609_030000_Laura_Coates_Live.mp4?exact=1&start=2100&end=2400",
+                "duration": 300
+        },
+        {
+                "title": "Laura Coates Live [2026-06-09 03:00] 00:40",
+                "file": "https://archive.org/download/CNNW_20260609_030000_Laura_Coates_Live/CNNW_20260609_030000_Laura_Coates_Live.mp4?exact=1&start=2400&end=2700",
+                "duration": 300
+        },
+        {
+                "title": "Laura Coates Live [2026-06-09 03:00] 00:45",
+                "file": "https://archive.org/download/CNNW_20260609_030000_Laura_Coates_Live/CNNW_20260609_030000_Laura_Coates_Live.mp4?exact=1&start=2700&end=3000",
+                "duration": 300
+        },
+        {
+                "title": "Laura Coates Live [2026-06-09 03:00] 00:50",
+                "file": "https://archive.org/download/CNNW_20260609_030000_Laura_Coates_Live/CNNW_20260609_030000_Laura_Coates_Live.mp4?exact=1&start=3000&end=3300",
+                "duration": 300
+        },
+        {
+                "title": "Laura Coates Live [2026-06-09 03:00] 00:55",
+                "file": "https://archive.org/download/CNNW_20260609_030000_Laura_Coates_Live/CNNW_20260609_030000_Laura_Coates_Live.mp4?exact=1&start=3300&end=3600",
+                "duration": 300
+        },
+        {
+                "title": "CNN NewsNight With Abby Phillip [2026-06-09 02:00] 00:00",
+                "file": "https://archive.org/download/CNNW_20260609_020000_CNN_NewsNight_With_Abby_Phillip/CNNW_20260609_020000_CNN_NewsNight_With_Abby_Phillip.mp4?exact=1&start=0&end=300",
+                "duration": 300
+        },
+        {
+                "title": "CNN NewsNight With Abby Phillip [2026-06-09 02:00] 00:05",
+                "file": "https://archive.org/download/CNNW_20260609_020000_CNN_NewsNight_With_Abby_Phillip/CNNW_20260609_020000_CNN_NewsNight_With_Abby_Phillip.mp4?exact=1&start=300&end=600",
+                "duration": 300
+        },
+        {
+                "title": "CNN NewsNight With Abby Phillip [2026-06-09 02:00] 00:10",
+                "file": "https://archive.org/download/CNNW_20260609_020000_CNN_NewsNight_With_Abby_Phillip/CNNW_20260609_020000_CNN_NewsNight_With_Abby_Phillip.mp4?exact=1&start=600&end=900",
+                "duration": 300
+        },
+        {
+                "title": "CNN NewsNight With Abby Phillip [2026-06-09 02:00] 00:15",
+                "file": "https://archive.org/download/CNNW_20260609_020000_CNN_NewsNight_With_Abby_Phillip/CNNW_20260609_020000_CNN_NewsNight_With_Abby_Phillip.mp4?exact=1&start=900&end=1200",
+                "duration": 300
+        },
+        {
+                "title": "CNN NewsNight With Abby Phillip [2026-06-09 02:00] 00:20",
+                "file": "https://archive.org/download/CNNW_20260609_020000_CNN_NewsNight_With_Abby_Phillip/CNNW_20260609_020000_CNN_NewsNight_With_Abby_Phillip.mp4?exact=1&start=1200&end=1500",
+                "duration": 300
+        },
+        {
+                "title": "News [2026-06-09 16:00] 00:15",
+                "file": "https://archive.org/download/RT_20260609_160000_News/RT_20260609_160000_News.mp4?exact=1&start=900&end=1200",
+                "duration": 300
+        },
+        {
+                "title": "CNN NewsNight With Abby Phillip [2026-06-09 02:00] 00:25",
+                "file": "https://archive.org/download/CNNW_20260609_020000_CNN_NewsNight_With_Abby_Phillip/CNNW_20260609_020000_CNN_NewsNight_With_Abby_Phillip.mp4?exact=1&start=1500&end=1800",
+                "duration": 300
+        },
+        {
+                "title": "CNN NewsNight With Abby Phillip [2026-06-09 02:00] 00:30",
+                "file": "https://archive.org/download/CNNW_20260609_020000_CNN_NewsNight_With_Abby_Phillip/CNNW_20260609_020000_CNN_NewsNight_With_Abby_Phillip.mp4?exact=1&start=1800&end=2100",
+                "duration": 300
+        },
+        {
+                "title": "CNN NewsNight With Abby Phillip [2026-06-09 02:00] 00:35",
+                "file": "https://archive.org/download/CNNW_20260609_020000_CNN_NewsNight_With_Abby_Phillip/CNNW_20260609_020000_CNN_NewsNight_With_Abby_Phillip.mp4?exact=1&start=2100&end=2400",
+                "duration": 300
+        },
+        {
+                "title": "CNN NewsNight With Abby Phillip [2026-06-09 02:00] 00:40",
+                "file": "https://archive.org/download/CNNW_20260609_020000_CNN_NewsNight_With_Abby_Phillip/CNNW_20260609_020000_CNN_NewsNight_With_Abby_Phillip.mp4?exact=1&start=2400&end=2700",
+                "duration": 300
+        },
+        {
+                "title": "CNN NewsNight With Abby Phillip [2026-06-09 02:00] 00:45",
+                "file": "https://archive.org/download/CNNW_20260609_020000_CNN_NewsNight_With_Abby_Phillip/CNNW_20260609_020000_CNN_NewsNight_With_Abby_Phillip.mp4?exact=1&start=2700&end=3000",
+                "duration": 300
+        },
+        {
+                "title": "CNN NewsNight With Abby Phillip [2026-06-09 02:00] 00:50",
+                "file": "https://archive.org/download/CNNW_20260609_020000_CNN_NewsNight_With_Abby_Phillip/CNNW_20260609_020000_CNN_NewsNight_With_Abby_Phillip.mp4?exact=1&start=3000&end=3300",
+                "duration": 300
+        },
+        {
+                "title": "CNN NewsNight With Abby Phillip [2026-06-09 02:00] 00:55",
+                "file": "https://archive.org/download/CNNW_20260609_020000_CNN_NewsNight_With_Abby_Phillip/CNNW_20260609_020000_CNN_NewsNight_With_Abby_Phillip.mp4?exact=1&start=3300&end=3600",
+                "duration": 300
+        },
+        {
+                "title": "The Source With Kaitlan Collins [2026-06-09 01:00] 00:00",
+                "file": "https://archive.org/download/CNNW_20260609_010000_The_Source_With_Kaitlan_Collins/CNNW_20260609_010000_The_Source_With_Kaitlan_Collins.mp4?exact=1&start=0&end=300",
+                "duration": 300
+        },
+        {
+                "title": "The Source With Kaitlan Collins [2026-06-09 01:00] 00:05",
+                "file": "https://archive.org/download/CNNW_20260609_010000_The_Source_With_Kaitlan_Collins/CNNW_20260609_010000_The_Source_With_Kaitlan_Collins.mp4?exact=1&start=300&end=600",
+                "duration": 300
+        },
+        {
+                "title": "The Source With Kaitlan Collins [2026-06-09 01:00] 00:10",
+                "file": "https://archive.org/download/CNNW_20260609_010000_The_Source_With_Kaitlan_Collins/CNNW_20260609_010000_The_Source_With_Kaitlan_Collins.mp4?exact=1&start=600&end=900",
+                "duration": 300
+        },
+        {
+                "title": "The Source With Kaitlan Collins [2026-06-09 01:00] 00:15",
+                "file": "https://archive.org/download/CNNW_20260609_010000_The_Source_With_Kaitlan_Collins/CNNW_20260609_010000_The_Source_With_Kaitlan_Collins.mp4?exact=1&start=900&end=1200",
+                "duration": 300
+        },
+        {
+                "title": "The Source With Kaitlan Collins [2026-06-09 01:00] 00:20",
+                "file": "https://archive.org/download/CNNW_20260609_010000_The_Source_With_Kaitlan_Collins/CNNW_20260609_010000_The_Source_With_Kaitlan_Collins.mp4?exact=1&start=1200&end=1500",
+                "duration": 300
+        },
+        {
+                "title": "The Source With Kaitlan Collins [2026-06-09 01:00] 00:25",
+                "file": "https://archive.org/download/CNNW_20260609_010000_The_Source_With_Kaitlan_Collins/CNNW_20260609_010000_The_Source_With_Kaitlan_Collins.mp4?exact=1&start=1500&end=1800",
+                "duration": 300
+        },
+        {
+                "title": "The Source With Kaitlan Collins [2026-06-09 01:00] 00:30",
+                "file": "https://archive.org/download/CNNW_20260609_010000_The_Source_With_Kaitlan_Collins/CNNW_20260609_010000_The_Source_With_Kaitlan_Collins.mp4?exact=1&start=1800&end=2100",
+                "duration": 300
+        },
+        {
+                "title": "The Source With Kaitlan Collins [2026-06-09 01:00] 00:35",
+                "file": "https://archive.org/download/CNNW_20260609_010000_The_Source_With_Kaitlan_Collins/CNNW_20260609_010000_The_Source_With_Kaitlan_Collins.mp4?exact=1&start=2100&end=2400",
+                "duration": 300
+        },
+        {
+                "title": "The Source With Kaitlan Collins [2026-06-09 01:00] 00:40",
+                "file": "https://archive.org/download/CNNW_20260609_010000_The_Source_With_Kaitlan_Collins/CNNW_20260609_010000_The_Source_With_Kaitlan_Collins.mp4?exact=1&start=2400&end=2700",
+                "duration": 300
+        },
+        {
+                "title": "The Source With Kaitlan Collins [2026-06-09 01:00] 00:45",
+                "file": "https://archive.org/download/CNNW_20260609_010000_The_Source_With_Kaitlan_Collins/CNNW_20260609_010000_The_Source_With_Kaitlan_Collins.mp4?exact=1&start=2700&end=3000",
+                "duration": 300
+        },
+        {
+                "title": "The Source With Kaitlan Collins [2026-06-09 01:00] 00:50",
+                "file": "https://archive.org/download/CNNW_20260609_010000_The_Source_With_Kaitlan_Collins/CNNW_20260609_010000_The_Source_With_Kaitlan_Collins.mp4?exact=1&start=3000&end=3300",
+                "duration": 300
+        },
+        {
+                "title": "The Source With Kaitlan Collins [2026-06-09 01:00] 00:55",
+                "file": "https://archive.org/download/CNNW_20260609_010000_The_Source_With_Kaitlan_Collins/CNNW_20260609_010000_The_Source_With_Kaitlan_Collins.mp4?exact=1&start=3300&end=3600",
+                "duration": 300
+        },
+        {
+                "title": "Anderson Cooper 360 [2026-06-09 00:00] 00:00",
+                "file": "https://archive.org/download/CNNW_20260609_000000_Anderson_Cooper_360/CNNW_20260609_000000_Anderson_Cooper_360.mp4?exact=1&start=0&end=300",
+                "duration": 300
+        },
+        {
+                "title": "Anderson Cooper 360 [2026-06-09 00:00] 00:05",
+                "file": "https://archive.org/download/CNNW_20260609_000000_Anderson_Cooper_360/CNNW_20260609_000000_Anderson_Cooper_360.mp4?exact=1&start=300&end=600",
+                "duration": 300
+        },
+        {
+                "title": "Anderson Cooper 360 [2026-06-09 00:00] 00:10",
+                "file": "https://archive.org/download/CNNW_20260609_000000_Anderson_Cooper_360/CNNW_20260609_000000_Anderson_Cooper_360.mp4?exact=1&start=600&end=900",
+                "duration": 300
+        },
+        {
+                "title": "Anderson Cooper 360 [2026-06-09 00:00] 00:15",
+                "file": "https://archive.org/download/CNNW_20260609_000000_Anderson_Cooper_360/CNNW_20260609_000000_Anderson_Cooper_360.mp4?exact=1&start=900&end=1200",
+                "duration": 300
+        },
+        {
+                "title": "Anderson Cooper 360 [2026-06-09 00:00] 00:20",
+                "file": "https://archive.org/download/CNNW_20260609_000000_Anderson_Cooper_360/CNNW_20260609_000000_Anderson_Cooper_360.mp4?exact=1&start=1200&end=1500",
+                "duration": 300
+        },
+        {
+                "title": "Anderson Cooper 360 [2026-06-09 00:00] 00:25",
+                "file": "https://archive.org/download/CNNW_20260609_000000_Anderson_Cooper_360/CNNW_20260609_000000_Anderson_Cooper_360.mp4?exact=1&start=1500&end=1800",
+                "duration": 300
+        },
+        {
+                "title": "Anderson Cooper 360 [2026-06-09 00:00] 00:30",
+                "file": "https://archive.org/download/CNNW_20260609_000000_Anderson_Cooper_360/CNNW_20260609_000000_Anderson_Cooper_360.mp4?exact=1&start=1800&end=2100",
+                "duration": 300
+        },
+        {
+                "title": "Anderson Cooper 360 [2026-06-09 00:00] 00:35",
+                "file": "https://archive.org/download/CNNW_20260609_000000_Anderson_Cooper_360/CNNW_20260609_000000_Anderson_Cooper_360.mp4?exact=1&start=2100&end=2400",
+                "duration": 300
+        },
+        {
+                "title": "Anderson Cooper 360 [2026-06-09 00:00] 00:40",
+                "file": "https://archive.org/download/CNNW_20260609_000000_Anderson_Cooper_360/CNNW_20260609_000000_Anderson_Cooper_360.mp4?exact=1&start=2400&end=2700",
+                "duration": 300
+        },
+        {
+                "title": "Anderson Cooper 360 [2026-06-09 00:00] 00:45",
+                "file": "https://archive.org/download/CNNW_20260609_000000_Anderson_Cooper_360/CNNW_20260609_000000_Anderson_Cooper_360.mp4?exact=1&start=2700&end=3000",
+                "duration": 300
+        },
+        {
+                "title": "Anderson Cooper 360 [2026-06-09 00:00] 00:50",
+                "file": "https://archive.org/download/CNNW_20260609_000000_Anderson_Cooper_360/CNNW_20260609_000000_Anderson_Cooper_360.mp4?exact=1&start=3000&end=3300",
+                "duration": 300
+        },
+        {
+                "title": "Anderson Cooper 360 [2026-06-09 00:00] 00:55",
+                "file": "https://archive.org/download/CNNW_20260609_000000_Anderson_Cooper_360/CNNW_20260609_000000_Anderson_Cooper_360.mp4?exact=1&start=3300&end=3600",
+                "duration": 300
+        },
+        {
+                "title": "News [2026-06-09 16:00] 00:00",
+                "file": "https://archive.org/download/RT_20260609_160000_News/RT_20260609_160000_News.mp4?exact=1&start=0&end=300",
+                "duration": 300
+        },
+        {
+                "title": "News [2026-06-09 16:00] 00:05",
+                "file": "https://archive.org/download/RT_20260609_160000_News/RT_20260609_160000_News.mp4?exact=1&start=300&end=600",
+                "duration": 300
+        },
+        {
+                "title": "News [2026-06-09 16:00] 00:10",
+                "file": "https://archive.org/download/RT_20260609_160000_News/RT_20260609_160000_News.mp4?exact=1&start=600&end=900",
+                "duration": 300
+        },
+        {
+                "title": "News [2026-06-09 16:00] 00:20",
+                "file": "https://archive.org/download/RT_20260609_160000_News/RT_20260609_160000_News.mp4?exact=1&start=1200&end=1500",
+                "duration": 300
+        },
+        {
+                "title": "News [2026-06-09 16:00] 00:25",
+                "file": "https://archive.org/download/RT_20260609_160000_News/RT_20260609_160000_News.mp4?exact=1&start=1500&end=1800",
+                "duration": 300
+        },
+        {
+                "title": "Documentary [2026-06-09 15:30] 00:00",
+                "file": "https://archive.org/download/RT_20260609_153000_Documentary/RT_20260609_153000_Documentary.mp4?exact=1&start=0&end=300",
+                "duration": 300
+        },
+        {
+                "title": "Documentary [2026-06-09 15:30] 00:05",
+                "file": "https://archive.org/download/RT_20260609_153000_Documentary/RT_20260609_153000_Documentary.mp4?exact=1&start=300&end=600",
+                "duration": 300
+        },
+        {
+                "title": "Documentary [2026-06-09 15:30] 00:10",
+                "file": "https://archive.org/download/RT_20260609_153000_Documentary/RT_20260609_153000_Documentary.mp4?exact=1&start=600&end=900",
+                "duration": 300
+        },
+        {
+                "title": "Documentary [2026-06-09 15:30] 00:15",
+                "file": "https://archive.org/download/RT_20260609_153000_Documentary/RT_20260609_153000_Documentary.mp4?exact=1&start=900&end=1200",
+                "duration": 300
+        },
+        {
+                "title": "Documentary [2026-06-09 15:30] 00:20",
+                "file": "https://archive.org/download/RT_20260609_153000_Documentary/RT_20260609_153000_Documentary.mp4?exact=1&start=1200&end=1500",
+                "duration": 300
+        },
+        {
+                "title": "Shift [2026-06-09 12:45] 00:10",
+                "file": "https://archive.org/download/DW_20260609_124500_Shift/DW_20260609_124500_Shift.mp4?exact=1&start=600&end=900",
+                "duration": 300
+        },
+        {
+                "title": "Documentary [2026-06-09 15:30] 00:25",
+                "file": "https://archive.org/download/RT_20260609_153000_Documentary/RT_20260609_153000_Documentary.mp4?exact=1&start=1500&end=1800",
+                "duration": 300
+        },
+        {
+                "title": "News [2026-06-09 15:00] 00:00",
+                "file": "https://archive.org/download/RT_20260609_150000_News/RT_20260609_150000_News.mp4?exact=1&start=0&end=300",
+                "duration": 300
+        },
+        {
+                "title": "News [2026-06-09 15:00] 00:05",
+                "file": "https://archive.org/download/RT_20260609_150000_News/RT_20260609_150000_News.mp4?exact=1&start=300&end=600",
+                "duration": 300
+        },
+        {
+                "title": "News [2026-06-09 15:00] 00:10",
+                "file": "https://archive.org/download/RT_20260609_150000_News/RT_20260609_150000_News.mp4?exact=1&start=600&end=900",
+                "duration": 300
+        },
+        {
+                "title": "News [2026-06-09 15:00] 00:15",
+                "file": "https://archive.org/download/RT_20260609_150000_News/RT_20260609_150000_News.mp4?exact=1&start=900&end=1200",
+                "duration": 300
+        },
+        {
+                "title": "News [2026-06-09 15:00] 00:20",
+                "file": "https://archive.org/download/RT_20260609_150000_News/RT_20260609_150000_News.mp4?exact=1&start=1200&end=1500",
+                "duration": 300
+        },
+        {
+                "title": "News [2026-06-09 15:00] 00:25",
+                "file": "https://archive.org/download/RT_20260609_150000_News/RT_20260609_150000_News.mp4?exact=1&start=1500&end=1800",
+                "duration": 300
+        },
+        {
+                "title": "Sanchez Effect [2026-06-09 14:30] 00:00",
+                "file": "https://archive.org/download/RT_20260609_143000_Sanchez_Effect/RT_20260609_143000_Sanchez_Effect.mp4?exact=1&start=0&end=300",
+                "duration": 300
+        },
+        {
+                "title": "Sanchez Effect [2026-06-09 14:30] 00:05",
+                "file": "https://archive.org/download/RT_20260609_143000_Sanchez_Effect/RT_20260609_143000_Sanchez_Effect.mp4?exact=1&start=300&end=600",
+                "duration": 300
+        },
+        {
+                "title": "Sanchez Effect [2026-06-09 14:30] 00:10",
+                "file": "https://archive.org/download/RT_20260609_143000_Sanchez_Effect/RT_20260609_143000_Sanchez_Effect.mp4?exact=1&start=600&end=900",
+                "duration": 300
+        },
+        {
+                "title": "Sanchez Effect [2026-06-09 14:30] 00:15",
+                "file": "https://archive.org/download/RT_20260609_143000_Sanchez_Effect/RT_20260609_143000_Sanchez_Effect.mp4?exact=1&start=900&end=1200",
+                "duration": 300
+        },
+        {
+                "title": "Sanchez Effect [2026-06-09 14:30] 00:20",
+                "file": "https://archive.org/download/RT_20260609_143000_Sanchez_Effect/RT_20260609_143000_Sanchez_Effect.mp4?exact=1&start=1200&end=1500",
+                "duration": 300
+        },
+        {
+                "title": "Sanchez Effect [2026-06-09 14:30] 00:25",
+                "file": "https://archive.org/download/RT_20260609_143000_Sanchez_Effect/RT_20260609_143000_Sanchez_Effect.mp4?exact=1&start=1500&end=1800",
+                "duration": 300
+        },
+        {
+                "title": "News [2026-06-09 14:00] 00:00",
+                "file": "https://archive.org/download/RT_20260609_140000_News/RT_20260609_140000_News.mp4?exact=1&start=0&end=300",
+                "duration": 300
+        },
+        {
+                "title": "News [2026-06-09 14:00] 00:05",
+                "file": "https://archive.org/download/RT_20260609_140000_News/RT_20260609_140000_News.mp4?exact=1&start=300&end=600",
+                "duration": 300
+        },
+        {
+                "title": "News [2026-06-09 14:00] 00:10",
+                "file": "https://archive.org/download/RT_20260609_140000_News/RT_20260609_140000_News.mp4?exact=1&start=600&end=900",
+                "duration": 300
+        },
+        {
+                "title": "News [2026-06-09 14:00] 00:15",
+                "file": "https://archive.org/download/RT_20260609_140000_News/RT_20260609_140000_News.mp4?exact=1&start=900&end=1200",
+                "duration": 300
+        },
+        {
+                "title": "News [2026-06-09 14:00] 00:20",
+                "file": "https://archive.org/download/RT_20260609_140000_News/RT_20260609_140000_News.mp4?exact=1&start=1200&end=1500",
+                "duration": 300
+        },
+        {
+                "title": "News [2026-06-09 14:00] 00:25",
+                "file": "https://archive.org/download/RT_20260609_140000_News/RT_20260609_140000_News.mp4?exact=1&start=1500&end=1800",
+                "duration": 300
+        },
+        {
+                "title": "Documentary [2026-06-09 13:30] 00:00",
+                "file": "https://archive.org/download/RT_20260609_133000_Documentary/RT_20260609_133000_Documentary.mp4?exact=1&start=0&end=300",
+                "duration": 300
+        },
+        {
+                "title": "Documentary [2026-06-09 13:30] 00:05",
+                "file": "https://archive.org/download/RT_20260609_133000_Documentary/RT_20260609_133000_Documentary.mp4?exact=1&start=300&end=600",
+                "duration": 300
+        },
+        {
+                "title": "Documentary [2026-06-09 13:30] 00:10",
+                "file": "https://archive.org/download/RT_20260609_133000_Documentary/RT_20260609_133000_Documentary.mp4?exact=1&start=600&end=900",
+                "duration": 300
+        },
+        {
+                "title": "Documentary [2026-06-09 13:30] 00:15",
+                "file": "https://archive.org/download/RT_20260609_133000_Documentary/RT_20260609_133000_Documentary.mp4?exact=1&start=900&end=1200",
+                "duration": 300
+        },
+        {
+                "title": "News [2026-06-09 12:00] 00:00",
+                "file": "https://archive.org/download/RT_20260609_120000_News/RT_20260609_120000_News.mp4?exact=1&start=0&end=300",
+                "duration": 300
+        },
+        {
+                "title": "Documentary [2026-06-09 13:30] 00:20",
+                "file": "https://archive.org/download/RT_20260609_133000_Documentary/RT_20260609_133000_Documentary.mp4?exact=1&start=1200&end=1500",
+                "duration": 300
+        },
+        {
+                "title": "Documentary [2026-06-09 13:30] 00:25",
+                "file": "https://archive.org/download/RT_20260609_133000_Documentary/RT_20260609_133000_Documentary.mp4?exact=1&start=1500&end=1800",
+                "duration": 300
+        },
+        {
+                "title": "News [2026-06-09 13:00] 00:00",
+                "file": "https://archive.org/download/RT_20260609_130000_News/RT_20260609_130000_News.mp4?exact=1&start=0&end=300",
+                "duration": 300
+        },
+        {
+                "title": "News [2026-06-09 13:00] 00:05",
+                "file": "https://archive.org/download/RT_20260609_130000_News/RT_20260609_130000_News.mp4?exact=1&start=300&end=600",
+                "duration": 300
+        },
+        {
+                "title": "News [2026-06-09 13:00] 00:10",
+                "file": "https://archive.org/download/RT_20260609_130000_News/RT_20260609_130000_News.mp4?exact=1&start=600&end=900",
+                "duration": 300
+        },
+        {
+                "title": "News [2026-06-09 13:00] 00:15",
+                "file": "https://archive.org/download/RT_20260609_130000_News/RT_20260609_130000_News.mp4?exact=1&start=900&end=1200",
+                "duration": 300
+        },
+        {
+                "title": "News [2026-06-09 13:00] 00:20",
+                "file": "https://archive.org/download/RT_20260609_130000_News/RT_20260609_130000_News.mp4?exact=1&start=1200&end=1500",
+                "duration": 300
+        },
+        {
+                "title": "News [2026-06-09 13:00] 00:25",
+                "file": "https://archive.org/download/RT_20260609_130000_News/RT_20260609_130000_News.mp4?exact=1&start=1500&end=1800",
+                "duration": 300
+        },
+        {
+                "title": "Documentary [2026-06-09 12:30] 00:00",
+                "file": "https://archive.org/download/RT_20260609_123000_Documentary/RT_20260609_123000_Documentary.mp4?exact=1&start=0&end=300",
+                "duration": 300
+        },
+        {
+                "title": "Documentary [2026-06-09 12:30] 00:05",
+                "file": "https://archive.org/download/RT_20260609_123000_Documentary/RT_20260609_123000_Documentary.mp4?exact=1&start=300&end=600",
+                "duration": 300
+        },
+        {
+                "title": "Documentary [2026-06-09 12:30] 00:10",
+                "file": "https://archive.org/download/RT_20260609_123000_Documentary/RT_20260609_123000_Documentary.mp4?exact=1&start=600&end=900",
+                "duration": 300
+        },
+        {
+                "title": "Documentary [2026-06-09 12:30] 00:15",
+                "file": "https://archive.org/download/RT_20260609_123000_Documentary/RT_20260609_123000_Documentary.mp4?exact=1&start=900&end=1200",
+                "duration": 300
+        },
+        {
+                "title": "Documentary [2026-06-09 12:30] 00:20",
+                "file": "https://archive.org/download/RT_20260609_123000_Documentary/RT_20260609_123000_Documentary.mp4?exact=1&start=1200&end=1500",
+                "duration": 300
+        },
+        {
+                "title": "Documentary [2026-06-09 12:30] 00:25",
+                "file": "https://archive.org/download/RT_20260609_123000_Documentary/RT_20260609_123000_Documentary.mp4?exact=1&start=1500&end=1800",
+                "duration": 300
+        },
+        {
+                "title": "News [2026-06-09 12:00] 00:05",
+                "file": "https://archive.org/download/RT_20260609_120000_News/RT_20260609_120000_News.mp4?exact=1&start=300&end=600",
+                "duration": 300
+        },
+        {
+                "title": "News [2026-06-09 12:00] 00:10",
+                "file": "https://archive.org/download/RT_20260609_120000_News/RT_20260609_120000_News.mp4?exact=1&start=600&end=900",
+                "duration": 300
+        },
+        {
+                "title": "News [2026-06-09 12:00] 00:15",
+                "file": "https://archive.org/download/RT_20260609_120000_News/RT_20260609_120000_News.mp4?exact=1&start=900&end=1200",
+                "duration": 300
+        },
+        {
+                "title": "News [2026-06-09 12:00] 00:20",
+                "file": "https://archive.org/download/RT_20260609_120000_News/RT_20260609_120000_News.mp4?exact=1&start=1200&end=1500",
+                "duration": 300
+        },
+        {
+                "title": "News [2026-06-09 12:00] 00:25",
+                "file": "https://archive.org/download/RT_20260609_120000_News/RT_20260609_120000_News.mp4?exact=1&start=1500&end=1800",
+                "duration": 300
+        },
+        {
+                "title": "Documentary [2026-06-09 11:30] 00:00",
+                "file": "https://archive.org/download/RT_20260609_113000_Documentary/RT_20260609_113000_Documentary.mp4?exact=1&start=0&end=300",
+                "duration": 300
+        },
+        {
+                "title": "Documentary [2026-06-09 11:30] 00:05",
+                "file": "https://archive.org/download/RT_20260609_113000_Documentary/RT_20260609_113000_Documentary.mp4?exact=1&start=300&end=600",
+                "duration": 300
+        },
+        {
+                "title": "Documentary [2026-06-09 11:30] 00:10",
+                "file": "https://archive.org/download/RT_20260609_113000_Documentary/RT_20260609_113000_Documentary.mp4?exact=1&start=600&end=900",
+                "duration": 300
+        },
+        {
+                "title": "News [2026-06-09 11:00] 00:25",
+                "file": "https://archive.org/download/RT_20260609_110000_News/RT_20260609_110000_News.mp4?exact=1&start=1500&end=1800",
+                "duration": 300
+        },
+        {
+                "title": "Documentary [2026-06-09 11:30] 00:15",
+                "file": "https://archive.org/download/RT_20260609_113000_Documentary/RT_20260609_113000_Documentary.mp4?exact=1&start=900&end=1200",
+                "duration": 300
+        },
+        {
+                "title": "Documentary [2026-06-09 11:30] 00:20",
+                "file": "https://archive.org/download/RT_20260609_113000_Documentary/RT_20260609_113000_Documentary.mp4?exact=1&start=1200&end=1500",
+                "duration": 300
+        },
+        {
+                "title": "Documentary [2026-06-09 11:30] 00:25",
+                "file": "https://archive.org/download/RT_20260609_113000_Documentary/RT_20260609_113000_Documentary.mp4?exact=1&start=1500&end=1800",
+                "duration": 300
+        },
+        {
+                "title": "News [2026-06-09 11:00] 00:00",
+                "file": "https://archive.org/download/RT_20260609_110000_News/RT_20260609_110000_News.mp4?exact=1&start=0&end=300",
+                "duration": 300
+        },
+        {
+                "title": "News [2026-06-09 11:00] 00:05",
+                "file": "https://archive.org/download/RT_20260609_110000_News/RT_20260609_110000_News.mp4?exact=1&start=300&end=600",
+                "duration": 300
+        },
+        {
+                "title": "News [2026-06-09 11:00] 00:10",
+                "file": "https://archive.org/download/RT_20260609_110000_News/RT_20260609_110000_News.mp4?exact=1&start=600&end=900",
+                "duration": 300
+        },
+        {
+                "title": "News [2026-06-09 11:00] 00:15",
+                "file": "https://archive.org/download/RT_20260609_110000_News/RT_20260609_110000_News.mp4?exact=1&start=900&end=1200",
+                "duration": 300
+        },
+        {
+                "title": "News [2026-06-09 11:00] 00:20",
+                "file": "https://archive.org/download/RT_20260609_110000_News/RT_20260609_110000_News.mp4?exact=1&start=1200&end=1500",
+                "duration": 300
+        },
+        {
+                "title": "Documentary [2026-06-09 10:30] 00:00",
+                "file": "https://archive.org/download/RT_20260609_103000_Documentary/RT_20260609_103000_Documentary.mp4?exact=1&start=0&end=300",
+                "duration": 300
+        },
+        {
+                "title": "Documentary [2026-06-09 10:30] 00:05",
+                "file": "https://archive.org/download/RT_20260609_103000_Documentary/RT_20260609_103000_Documentary.mp4?exact=1&start=300&end=600",
+                "duration": 300
+        },
+        {
+                "title": "The Faulkner Focus [2026-06-09 15:00] 00:00",
+                "file": "https://archive.org/download/FOXNEWSW_20260609_150000_The_Faulkner_Focus/FOXNEWSW_20260609_150000_The_Faulkner_Focus.mp4?exact=1&start=0&end=300",
+                "duration": 300
+        },
+        {
+                "title": "2026-Jun-08, Monday \u00b7 Alex Jones Show \u00b7 Hour 1",
+                "file": "https://ajn.archives.pub/hourly-m4v/20260608_Mon_Alex-Hr1.m4v",
+                "duration": 3590
+        },
+        {
+                "title": "2026-Jun-08, Monday \u00b7 Alex Jones Show \u00b7 Hour 2",
+                "file": "https://ajn.archives.pub/hourly-m4v/20260608_Mon_Alex-Hr2.m4v",
+                "duration": 3590
+        },
+        {
+                "title": "2026-Jun-08, Monday \u00b7 Alex Jones Show \u00b7 Hour 3",
+                "file": "https://ajn.archives.pub/hourly-m4v/20260608_Mon_Alex-Hr3.m4v",
+                "duration": 3590
+        },
+        {
+                "title": "2026-Jun-08, Monday \u00b7 War Room \u00b7 Hour 1",
+                "file": "https://ajn.archives.pub/hourly-m4v/20260608_Mon_WarRoom-Hr1.m4v",
+                "duration": 3590
+        },
+        {
+                "title": "2026-Jun-08, Monday \u00b7 War Room \u00b7 Hour 2",
+                "file": "https://ajn.archives.pub/hourly-m4v/20260608_Mon_WarRoom-Hr2.m4v",
+                "duration": 3590
+        },
+        {
+                "title": "2026-Jun-08, Monday \u00b7 War Room \u00b7 Hour 3",
+                "file": "https://ajn.archives.pub/hourly-m4v/20260608_Mon_WarRoom-Hr3.m4v",
+                "duration": 3590
+        },
+        {
+                "title": "2026-Jun-03, Wednesday \u00b7 Alex Jones Show \u00b7 Hour 1",
+                "file": "https://ajn.archives.pub/hourly-m4v/20260603_Wed_Alex-Hr1.m4v",
+                "duration": 3590
+        },
+        {
+                "title": "2026-Jun-03, Wednesday \u00b7 Alex Jones Show \u00b7 Hour 2",
+                "file": "https://ajn.archives.pub/hourly-m4v/20260603_Wed_Alex-Hr2.m4v",
+                "duration": 3590
+        },
+        {
+                "title": "2026-Jun-03, Wednesday \u00b7 Alex Jones Show \u00b7 Hour 3",
+                "file": "https://ajn.archives.pub/hourly-m4v/20260603_Wed_Alex-Hr3.m4v",
+                "duration": 3590
+        },
+        {
+                "title": "2026-Jun-03, Wednesday \u00b7 Alex Jones Show \u00b7 Hour 4",
+                "file": "https://ajn.archives.pub/hourly-m4v/20260603_Wed_Alex-Hr4.m4v",
+                "duration": 3590
+        },
+        {
+                "title": "2026-Jun-03, Wednesday \u00b7 War Room \u00b7 Hour 1",
+                "file": "https://ajn.archives.pub/hourly-m4v/20260603_Wed_WarRoom-Hr1.m4v",
+                "duration": 3590
+        },
+        {
+                "title": "2026-Jun-03, Wednesday \u00b7 War Room \u00b7 Hour 2",
+                "file": "https://ajn.archives.pub/hourly-m4v/20260603_Wed_WarRoom-Hr2.m4v",
+                "duration": 3590
+        },
+        {
+                "title": "2026-Jun-03, Wednesday \u00b7 War Room \u00b7 Hour 3",
+                "file": "https://ajn.archives.pub/hourly-m4v/20260603_Wed_WarRoom-Hr3.m4v",
+                "duration": 3590
+        },
+        {
+                "title": "2026-Jun-04, Thursday \u00b7 Alex Jones Show \u00b7 Hour 1",
+                "file": "https://ajn.archives.pub/hourly-m4v/20260604_Thu_Alex-Hr1.m4v",
+                "duration": 3590
+        },
+        {
+                "title": "2026-Jun-04, Thursday \u00b7 Alex Jones Show \u00b7 Hour 2",
+                "file": "https://ajn.archives.pub/hourly-m4v/20260604_Thu_Alex-Hr2.m4v",
+                "duration": 3590
+        },
+        {
+                "title": "2026-Jun-04, Thursday \u00b7 Alex Jones Show \u00b7 Hour 3",
+                "file": "https://ajn.archives.pub/hourly-m4v/20260604_Thu_Alex-Hr3.m4v",
+                "duration": 3590
+        },
+        {
+                "title": "2026-Jun-04, Thursday \u00b7 Alex Jones Show \u00b7 Hour 4",
+                "file": "https://ajn.archives.pub/hourly-m4v/20260604_Thu_Alex-Hr4.m4v",
+                "duration": 3590
+        },
+        {
+                "title": "2026-Jun-04, Thursday \u00b7 War Room \u00b7 Hour 1",
+                "file": "https://ajn.archives.pub/hourly-m4v/20260604_Thu_WarRoom-Hr1.m4v",
+                "duration": 3590
+        },
+        {
+                "title": "2026-Jun-04, Thursday \u00b7 War Room \u00b7 Hour 2",
+                "file": "https://ajn.archives.pub/hourly-m4v/20260604_Thu_WarRoom-Hr2.m4v",
+                "duration": 3590
+        },
+        {
+                "title": "2026-Jun-04, Thursday \u00b7 War Room \u00b7 Hour 3",
+                "file": "https://ajn.archives.pub/hourly-m4v/20260604_Thu_WarRoom-Hr3.m4v",
+                "duration": 3590
+        },
+        {
+                "title": "2026-Jun-05, Friday \u00b7 Alex Jones Show \u00b7 Hour 1",
+                "file": "https://ajn.archives.pub/hourly-m4v/20260605_Fri_Alex-Hr1.m4v",
+                "duration": 3590
+        },
+        {
+                "title": "2026-Jun-05, Friday \u00b7 Alex Jones Show \u00b7 Hour 2",
+                "file": "https://ajn.archives.pub/hourly-m4v/20260605_Fri_Alex-Hr2.m4v",
+                "duration": 3590
+        },
+        {
+                "title": "2026-Jun-05, Friday \u00b7 Alex Jones Show \u00b7 Hour 3",
+                "file": "https://ajn.archives.pub/hourly-m4v/20260605_Fri_Alex-Hr3.m4v",
+                "duration": 3590
+        },
+        {
+                "title": "2026-Jun-05, Friday \u00b7 Alex Jones Show \u00b7 Hour 4",
+                "file": "https://ajn.archives.pub/hourly-m4v/20260605_Fri_Alex-Hr4.m4v",
+                "duration": 3590
+        },
+        {
+                "title": "2026-Jun-05, Friday \u00b7 War Room \u00b7 Hour 1",
+                "file": "https://ajn.archives.pub/hourly-m4v/20260605_Fri_WarRoom-Hr1.m4v",
+                "duration": 3590
+        },
+        {
+                "title": "2026-Jun-05, Friday \u00b7 War Room \u00b7 Hour 2",
+                "file": "https://ajn.archives.pub/hourly-m4v/20260605_Fri_WarRoom-Hr2.m4v",
+                "duration": 3590
+        },
+        {
+                "title": "2026-Jun-05, Friday \u00b7 War Room \u00b7 Hour 3",
+                "file": "https://ajn.archives.pub/hourly-m4v/20260605_Fri_WarRoom-Hr3.m4v",
+                "duration": 3590
+        },
+        {
+                "title": "2026-Jun-07, Sunday \u00b7 Alex Jones Show \u00b7 Hour 1",
+                "file": "https://ajn.archives.pub/hourly-m4v/20260607_Sun_Alex-Hr1.m4v",
+                "duration": 3590
+        },
+        {
+                "title": "2026-Jun-07, Sunday \u00b7 Alex Jones Show \u00b7 Hour 2",
+                "file": "https://ajn.archives.pub/hourly-m4v/20260607_Sun_Alex-Hr2.m4v",
+                "duration": 3590
+        },
+        {
+                "title": "2026-Jun-07, Sunday \u00b7 SundayLive \u00b7 Hour 1",
+                "file": "https://ajn.archives.pub/hourly-m4v/20260607_Sun_SundayLive-Hr1.m4v",
+                "duration": 3590
+        },
+        {
+                "title": "2026-Jun-07, Sunday \u00b7 SundayLive \u00b7 Hour 2",
+                "file": "https://ajn.archives.pub/hourly-m4v/20260607_Sun_SundayLive-Hr2.m4v",
+                "duration": 3590
+        }
+];
 
-    // ---------- SCHEDULE GENERATOR (cumulative durations from midnight) ----------
+    // -------------------------------------------------------------------------
+    // Generate 24-hour schedule using integer seconds (no floating drift)
+    // -------------------------------------------------------------------------
     function generate24hrSchedule() {
         let schedule = [];
-        let currentMinutes = 0;
+        let currentSeconds = 0;
         const startOfDay = new Date();
         startOfDay.setHours(0, 0, 0, 0);
+        const MAX_SECONDS = 24 * 3600;
         let index = 0;
-        while (currentMinutes < 24 * 60) {
+
+        while (currentSeconds < MAX_SECONDS && index < playlist.length * 10) {
             const item = playlist[index % playlist.length];
-            const startMins = currentMinutes;
-            const endMins = currentMinutes + (item.duration / 60);
-            const startDate = new Date(startOfDay.getTime() + startMins * 60000);
-            const startFormatted = startDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+            if (!item) break;
+
+            const durationSec = item.duration || 1800; // fallback to 30 min
+            const startSeconds = currentSeconds;
+            const endSeconds = currentSeconds + durationSec;
+
+            const startDate = new Date(startOfDay.getTime() + startSeconds * 1000);
+            const startFormatted = startDate.toLocaleTimeString('en-US', {
+                hour: 'numeric', minute: '2-digit', hour12: true
+            });
+
             schedule.push({
                 title: item.title,
                 startTime: startFormatted,
-                startMinutes: startMins,
-                endMinutes: endMins,
-                url: item.url,
-                playlistIndex: index % playlist.length
+                startSeconds: startSeconds,
+                endSeconds: endSeconds,
+                file: item.file,
+                playlistIndex: index % playlist.length   // absolute index in playlist
             });
-            currentMinutes = endMins;
+
+            currentSeconds = endSeconds;
             index++;
         }
         return schedule;
     }
 
     let fullSchedule = generate24hrSchedule();
-    let currentVideoIndex = 0;       // index in playlist
-    let currentScheduleIndex = -1;    // index in fullSchedule (for UI)
+    let currentScheduleIndex = -1;       // index in fullSchedule, not playlist
     let hls = null;
     const videoPlayer = document.getElementById('video-player');
 
-    // ---------- LOAD STREAM (fix #2: no double load) ----------
-    function loadStream(url, playlistIdx) {
-        if (hls) {
-            hls.destroy();
-            hls = null;
-        }
+    // -------------------------------------------------------------------------
+    // loadStream – uses playlistIndex from schedule item
+    // -------------------------------------------------------------------------
+    function loadStream(url, playlistIdx, scheduleIdx = null) {
+        if (hls) { hls.destroy(); hls = null; }
         videoPlayer.pause();
-        videoPlayer.removeAttribute('src');   // clear previous source
-        videoPlayer.muted = true;              // ensure autoplay
-        videoPlayer.src = url;
-        videoPlayer.load();                    // single load
+        videoPlayer.removeAttribute('src');
+
+        // Debug log – verify mapping
+        const expectedTitle = playlist[playlistIdx]?.title || 'UNKNOWN';
+        console.log(`[loadStream] Playing index ${playlistIdx} -> "${expectedTitle}" (URL: ${url})`);
+
+        if (url.toLowerCase().includes('.m3u8')) {
+            if (Hls.isSupported()) {
+                hls = new Hls({ maxMaxBufferLength: 30 });
+                hls.loadSource(url);
+                hls.attachMedia(videoPlayer);
+            } else if (videoPlayer.canPlayType('application/vnd.apple.mpegurl')) {
+                videoPlayer.src = url;
+            }
+        } else {
+            videoPlayer.src = url;
+        }
+
         videoPlayer.play().catch(e => console.warn("Autoplay prevented:", e));
-        currentVideoIndex = playlistIdx;
-        // Immediately refresh UI to show new show (since video end triggers this)
+
+        // Store current schedule index for later auto-advance
+        if (scheduleIdx !== null) {
+            currentScheduleIndex = scheduleIdx;
+        } else {
+            // Try to find which schedule item has this playlistIndex (fallback)
+            const found = fullSchedule.findIndex(item => item.playlistIndex === playlistIdx);
+            currentScheduleIndex = found !== -1 ? found : currentScheduleIndex;
+        }
+
         updateNowPlaying(true);
-        // Update status
         document.getElementById('stream-status').textContent = 'STATUS: PLAYING';
         document.getElementById('stream-status').className = 'info-bubble bg-green-900/50 text-green-400 border-green-400';
     }
 
-    // Auto-advance when video ends (continuous playlist loop)
+    // -------------------------------------------------------------------------
+    // Auto-advance using schedule, not raw playlist order
+    // -------------------------------------------------------------------------
     videoPlayer.onended = () => {
-        console.log("Video ended – advancing to next show");
-        const nextPlaylistIdx = (currentVideoIndex + 1) % playlist.length;
-        loadStream(playlist[nextPlaylistIdx].url, nextPlaylistIdx);
+        if (fullSchedule.length === 0) return;
+        // Find the next schedule entry after the current one
+        let nextScheduleIdx = (currentScheduleIndex + 1) % fullSchedule.length;
+        const nextItem = fullSchedule[nextScheduleIdx];
+        if (nextItem) {
+            console.log(`[onended] Advancing to schedule index ${nextScheduleIdx} (playlist index ${nextItem.playlistIndex})`);
+            loadStream(nextItem.file, nextItem.playlistIndex, nextScheduleIdx);
+        } else {
+            console.warn("[onended] No next schedule item found, reloading first");
+            loadStream(fullSchedule[0].file, fullSchedule[0].playlistIndex, 0);
+        }
     };
 
-    // Handle errors
     videoPlayer.onerror = (e) => {
         console.error("Video error:", videoPlayer.error);
         document.getElementById('stream-status').textContent = 'STATUS: ERROR';
         document.getElementById('stream-status').className = 'info-bubble bg-red-900/50 text-red-400 border-red-400';
     };
 
-    // ---------- UI UPDATE (every 5 seconds, no memory bloat) ----------
+    // -------------------------------------------------------------------------
+    // updateNowPlaying – uses schedule index for highlighting
+    // -------------------------------------------------------------------------
     function updateNowPlaying(force = false) {
         const now = new Date();
-        const currentMinutes = now.getHours() * 60 + now.getMinutes() + now.getSeconds() / 60;
+        const currentSeconds = now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds();
         let activeIdx = -1;
         for (let i = 0; i < fullSchedule.length; i++) {
             const s = fullSchedule[i];
-            // Midnight rollover handled because endMinutes may be < startMinutes (but our generator doesn't cross midnight? It may if total duration > 24h – but we generate exactly 24h)
-            // Since we stop at 24h, endMinutes is always > startMinutes except the last item might end exactly at 24h.
-            if (currentMinutes >= s.startMinutes && currentMinutes < s.endMinutes) {
+            if (currentSeconds >= s.startSeconds && currentSeconds < s.endSeconds) {
                 activeIdx = i;
                 break;
             }
         }
-        // If none found (e.g., exactly at 24:00), default to last item
-        if (activeIdx === -1 && fullSchedule.length > 0) activeIdx = fullSchedule.length - 1;
+        if (activeIdx === -1 && fullSchedule.length > 0) activeIdx = 0; // default to first
 
         if (activeIdx !== -1) {
-            // Update schedule highlight
+            // Update UI highlight
             document.querySelectorAll('.schedule-item').forEach(el => el.classList.remove('active'));
             const activeEl = document.getElementById(`schedule-item-${activeIdx}`);
             if (activeEl) activeEl.classList.add('active');
-            // Update now playing text
+
             const currentShow = fullSchedule[activeIdx].title;
             document.getElementById('current-show').textContent = currentShow;
             document.getElementById('fullscreen-now').textContent = currentShow;
-            // Update next show info
+
             const nextIdx = (activeIdx + 1) % fullSchedule.length;
             const nextShow = fullSchedule[nextIdx];
-            document.getElementById('fullscreen-next').innerHTML = `Next: ${nextShow.title} @ ${nextShow.startTime}`;
-            // Auto-scroll only if force or index changed (optional)
+            const nextContainer = document.getElementById('fullscreen-next');
+            nextContainer.textContent = '';
+            const prefix = document.createTextNode('Next: ');
+            const titleSpan = document.createElement('span');
+            titleSpan.textContent = nextShow.title;
+            const suffix = document.createTextNode(` @ ${nextShow.startTime}`);
+            nextContainer.appendChild(prefix);
+            nextContainer.appendChild(titleSpan);
+            nextContainer.appendChild(suffix);
+
+            // Auto-scroll only when schedule index changes
             if (force || activeIdx !== currentScheduleIndex) {
                 const el = document.getElementById(`schedule-item-${activeIdx}`);
                 if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
                 currentScheduleIndex = activeIdx;
             }
-        } else {
-            document.getElementById('current-show').textContent = "Schedule syncing...";
         }
 
         // Update clocks
@@ -406,7 +2889,9 @@
         if (fsClock) fsClock.textContent = timeStr;
     }
 
-    // ---------- RENDER SCHEDULE UI ----------
+    // -------------------------------------------------------------------------
+    // Render schedule – onclick passes both file and playlistIndex + schedule index
+    // -------------------------------------------------------------------------
     function renderScheduleUI() {
         const container = document.getElementById('schedule-list');
         container.innerHTML = '';
@@ -415,33 +2900,36 @@
             div.className = 'schedule-item';
             div.id = `schedule-item-${idx}`;
             div.onclick = () => {
-                // Manual jump to that show
-                loadStream(item.url, item.playlistIndex);
+                console.log(`[click] Schedule index ${idx} -> playlist index ${item.playlistIndex} (${item.title})`);
+                loadStream(item.file, item.playlistIndex, idx);
             };
-            // You can add thumbnails if available
-            div.innerHTML = `
-                <span class="time-label">${item.startTime}</span>
-                <span class="title-label">${item.title}</span>
-            `;
+            const span1 = document.createElement('span');
+            span1.className = 'time-label';
+            span1.textContent = item.startTime;
+            const span2 = document.createElement('span');
+            span2.className = 'title-label';
+            span2.textContent = item.title;
+            div.appendChild(span1);
+            div.appendChild(span2);
             container.appendChild(div);
         });
     }
 
-    // ---------- VOLUME CONTROL ----------
+    // -------------------------------------------------------------------------
+    // Volume & UI utilities
+    // -------------------------------------------------------------------------
     const volumeSlider = document.getElementById('volume-slider');
     const volumeDisplay = document.getElementById('volume-display');
     function updateVolume() {
         videoPlayer.volume = volumeSlider.value;
         const percent = Math.round(volumeSlider.value * 100);
-        volumeDisplay.textContent = `${percent}%`;
-        if (volumeSlider.value == 0) videoPlayer.muted = true;
-        else videoPlayer.muted = false;
+        volumeDisplay.textContent = percent + "%";
+        videoPlayer.muted = (volumeSlider.value == 0);
     }
     volumeSlider.addEventListener('input', updateVolume);
     videoPlayer.volume = 0.5;
     updateVolume();
 
-    // ---------- CONTROL FUNCTIONS ----------
     window.stopPlayback = function() {
         videoPlayer.pause();
         if (hls) { hls.destroy(); hls = null; }
@@ -451,21 +2939,26 @@
     };
     window.toggleFullscreen = function() {
         const container = document.getElementById('tv-player-container');
-        if (!document.fullscreenElement) {
-            container.requestFullscreen().catch(err => console.error(err));
-        } else {
-            document.exitFullscreen();
-        }
+        if (!document.fullscreenElement) { container.requestFullscreen().catch(err => console.error(err)); }
+        else { document.exitFullscreen(); }
+    };
+    window.toggleMobileSchedule = function() {
+        const grid = document.getElementById('schedule-grid');
+        grid.classList.toggle('mobile-visible');
     };
 
-    // ---------- INIT ----------
     function init() {
+        if (!playlist.length) {
+            document.getElementById('schedule-list').innerHTML = '<div class="text-red-400 p-4">ERROR: No playlist data.</div>';
+            return;
+        }
         renderScheduleUI();
-        // Start playing first video
-        loadStream(playlist[0].url, 0);
-        // UI updates every 5 seconds (lightweight)
+        // Start with the first schedule item (which corresponds to the first playlist item)
+        const firstSchedule = fullSchedule[0];
+        if (firstSchedule) {
+            loadStream(firstSchedule.file, firstSchedule.playlistIndex, 0);
+        }
         setInterval(updateNowPlaying, 5000);
-        // Also update immediately
         updateNowPlaying();
     }
     init();
