@@ -1,865 +1,474 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Video Player with Sidebars</title>
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/video.js/8.5.2/video-js.min.css" rel="stylesheet">
-    <link href="https://cdn.jsdelivr.net/npm/feather-icons/dist/feather.min.css" rel="stylesheet">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/video.js/8.5.2/video.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/hls.js@1.4.0/dist/hls.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/dashjs/dist/dash.all.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/feather-icons/dist/feather.min.js"></script>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1.0" />
+    <title>Continuous Playlist TV Player | 5s UI Updates</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
+        :root {
+            --bg-color: #1a1a1a;
+            --gold-color: #f59e0b;
+            --dark-card: #282828;
+            --text-light: #f3f4f6;
+            --blue-accent: #2563eb;
         }
-
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: #111;
-            color: #fff;
-            overflow-x: hidden;
-        }
-
-        #player-container {
-            position: relative;
-            width: 100%;
-            height: 100vh;
+            margin: 0;
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-light);
             display: flex;
-            transition: all 0.3s ease;
+            justify-content: center;
+            padding: 20px;
+            min-height: 100vh;
         }
-
-        /* Video Player Styles */
-        #video-container {
-            position: relative;
+        .player-wrapper {
             width: 100%;
-            height: 100%;
-            background: #000;
-            z-index: 1;
-            transition: filter 0.3s ease;
+            max-width: 1600px;
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 20px;
+            transition: grid-template-columns 0.4s ease-in-out;
         }
-
+        #tv-player-container {
+            width: 100%;
+            aspect-ratio: 16 / 9;
+            background: #000;
+            border: 4px solid var(--dark-card);
+            border-radius: 12px;
+            overflow: hidden;
+            position: relative;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+        }
         #video-player {
             width: 100%;
             height: 100%;
-            object-fit: contain;
-        }
-
-        .dim-overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.7);
-            z-index: 998;
-            opacity: 0;
-            visibility: hidden;
-            transition: opacity 0.3s ease, visibility 0.3s ease;
-        }
-
-        .dim-overlay.active {
-            opacity: 1;
-            visibility: visible;
-        }
-
-        /* Sidebar Styles */
-        .sidebar {
-            position: fixed;
-            top: 0;
-            width: 320px;
-            height: 100%;
-            background: #1a1a1a;
-            z-index: 999;
-            transition: transform 0.3s ease;
-            overflow-y: auto;
-            box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
-        }
-
-        #playlist-sidebar {
-            left: 0;
-            transform: translateX(-100%);
-        }
-
-        #settings-sidebar {
-            right: 0;
-            transform: translateX(100%);
-        }
-
-        .sidebar.active {
-            transform: translateX(0);
-        }
-
-        .sidebar-header {
-            padding: 20px;
-            border-bottom: 1px solid #333;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        .sidebar-title {
-            font-size: 1.2rem;
-            font-weight: 600;
-        }
-
-        .close-sidebar {
-            background: none;
-            border: none;
-            color: #fff;
-            cursor: pointer;
-            font-size: 1.2rem;
-        }
-
-        .sidebar-content {
-            padding: 20px;
-        }
-
-        /* Playlist Styles */
-        .playlist-item {
-            display: flex;
-            padding: 12px;
-            border-bottom: 1px solid #2a2a2a;
-            cursor: pointer;
-            transition: background 0.2s ease;
-        }
-
-        .playlist-item:hover {
-            background: #2a2a2a;
-        }
-
-        .playlist-item.active {
-            background: #333;
-            border-left: 3px solid #ffcc00;
-        }
-
-        .playlist-thumb {
-            width: 80px;
-            height: 45px;
-            background: #333;
-            margin-right: 12px;
-            flex-shrink: 0;
-            background-size: cover;
-            background-position: center;
-        }
-
-        .playlist-info {
-            flex: 1;
-        }
-
-        .playlist-title {
-            font-size: 0.9rem;
-            margin-bottom: 4px;
-            line-height: 1.3;
-        }
-
-        .playlist-duration {
-            font-size: 0.8rem;
-            color: #aaa;
-        }
-
-        /* Settings Styles */
-        .settings-group {
-            margin-bottom: 25px;
-        }
-
-        .settings-title {
-            font-size: 1rem;
-            margin-bottom: 12px;
-            color: #ffcc00;
-            font-weight: 600;
-        }
-
-        .settings-option {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 12px;
-        }
-
-        .settings-label {
-            font-size: 0.9rem;
-        }
-
-        .settings-control {
-            background: #333;
-            border: none;
-            color: #fff;
-            padding: 6px 12px;
-            border-radius: 4px;
-        }
-
-        /* Control Bar Styles */
-        #control-bar {
-            position: absolute;
-            bottom: 0;
-            left: 0;
-            width: 100%;
-            background: linear-gradient(transparent, rgba(0, 0, 0, 0.8));
-            padding: 15px 20px;
-            display: flex;
-            align-items: center;
-            z-index: 10;
-        }
-
-        .control-btn {
-            background: none;
-            border: none;
-            color: #fff;
-            font-size: 1.2rem;
-            margin-right: 15px;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            width: 36px;
-            height: 36px;
-            border-radius: 50%;
-            transition: background 0.2s ease;
-        }
-
-        .control-btn:hover {
-            background: rgba(255, 255, 255, 0.1);
-        }
-
-        .progress-container {
-            flex: 1;
-            height: 5px;
-            background: rgba(255, 255, 255, 0.2);
-            border-radius: 3px;
-            margin: 0 15px;
-            cursor: pointer;
-            position: relative;
-        }
-
-        .progress-bar {
-            height: 100%;
-            background: #ffcc00;
-            border-radius: 3px;
-            width: 0%;
-        }
-
-        .time-display {
-            font-size: 0.9rem;
-            color: #fff;
-            min-width: 100px;
-            text-align: center;
-        }
-
-        /* Info Bar */
-        #info-bar {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            background: linear-gradient(rgba(0, 0, 0, 0.8), transparent);
-            padding: 15px 20px;
-            display: flex;
-            justify-content: space-between;
-            z-index: 10;
-        }
-
-        .video-title {
-            font-size: 1.1rem;
-            font-weight: 600;
-        }
-
-        .video-meta {
-            font-size: 0.9rem;
-            color: #ccc;
-        }
-
-        /* Debug Console */
-        #debug-console {
-            position: fixed;
-            bottom: 10px;
-            right: 10px;
-            width: 300px;
-            height: 150px;
-            background: rgba(0, 0, 0, 0.8);
-            border: 1px solid #333;
-            padding: 10px;
-            font-size: 0.8rem;
-            overflow-y: auto;
-            z-index: 1000;
-            display: none;
-        }
-
-        #debug-console.active {
+            object-fit: cover;
             display: block;
         }
-
-        /* Loading State */
-        .loading {
+        .player-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: calc(100% - 50px);
+            pointer-events: none;
+            padding: 20px;
+        }
+        .info-bubble {
+            background-color: rgba(40, 40, 40, 0.8);
+            border: 1px solid var(--blue-accent);
+            color: var(--blue-accent);
+            padding: 6px 12px;
+            border-radius: 9999px;
+            font-weight: 600;
+            font-size: 14px;
+            box-shadow: 0 0 8px rgba(37, 99, 235, 0.4);
+        }
+        #channel-id {
+            background-color: var(--blue-accent) !important;
+            color: white !important;
+        }
+        .schedule-grid {
+            background-color: var(--dark-card);
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4);
+            max-height: 80vh;
+            overflow-y: auto;
+            padding: 10px;
+        }
+        .schedule-item {
             display: flex;
-            justify-content: center;
             align-items: center;
-            height: 100%;
-            font-size: 1.1rem;
-            color: #ffcc00;
+            padding: 8px;
+            border-radius: 6px;
+            margin-bottom: 4px;
+            transition: background-color 0.2s;
+            border-left: 3px solid transparent;
+            cursor: pointer;
         }
-
-        /* Responsive */
-        @media (max-width: 768px) {
-            .sidebar {
-                width: 280px;
+        .schedule-item:hover {
+            background-color: rgba(37, 99, 235, 0.1);
+        }
+        .schedule-item.active {
+            background-color: rgba(37, 99, 235, 0.2);
+            border-left: 3px solid var(--blue-accent);
+            font-weight: bold;
+        }
+        .time-label {
+            min-width: 80px;
+            font-size: 12px;
+            color: #ccc;
+            margin-right: 10px;
+            font-family: monospace;
+        }
+        .title-label {
+            font-size: 14px;
+            flex-grow: 1;
+        }
+        .thumbnail-img {
+            width: 40px;
+            height: 40px;
+            border-radius: 4px;
+            margin-right: 8px;
+            object-fit: cover;
+        }
+        #now-playing-banner {
+            background-color: rgba(0, 0, 0, 0.7);
+            color: white;
+            padding: 8px 15px;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 500;
+            width: fit-content;
+            margin-top: 10px;
+            border-left: 4px solid var(--blue-accent);
+        }
+        #current-show {
+            color: var(--blue-accent);
+            font-weight: 700;
+        }
+        @media (min-width: 1024px) {
+            .player-wrapper {
+                grid-template-columns: 1fr 0;
+                gap: 0;
+            }
+            .schedule-grid {
+                opacity: 0;
+                pointer-events: none;
+                overflow: hidden;
+                padding: 0;
+                margin: 0;
+                min-width: 0;
+                transition: opacity 0.4s ease-in-out, padding 0.4s ease-in-out;
+            }
+            .player-wrapper:hover {
+                grid-template-columns: 3fr 1fr;
+                gap: 20px;
+            }
+            .player-wrapper:hover .schedule-grid {
+                opacity: 1;
+                pointer-events: auto;
+                padding: 10px;
+                margin-left: 0;
             }
         }
-
-        @media (max-width: 480px) {
-            .sidebar {
-                width: 100%;
-            }
+        #fullscreen-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            background: linear-gradient(to bottom, rgba(0,0,0,0.95) 0%, transparent 100%);
+            padding: 25px 40px;
+            z-index: 2000;
+            display: none;
+            pointer-events: none;
+        }
+        #tv-player-container:fullscreen #fullscreen-overlay {
+            display: block;
+        }
+        #fullscreen-title {
+            font-size: 36px;
+            font-weight: 800;
+            color: #2563eb;
+            text-shadow: 2px 2px 10px rgba(0,0,0,1);
+            margin-bottom: 15px;
+        }
+        #fullscreen-info {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 20px;
+            font-size: 20px;
+            color: white;
+            text-shadow: 2px 2px 6px rgba(0,0,0,1);
+        }
+        #fullscreen-now {
+            flex: 2;
+            font-weight: 700;
+            font-size: 24px;
+        }
+        #fullscreen-clock {
+            font-family: monospace;
+            font-size: 28px;
+            color: #f59e0b;
+            background-color: rgba(0,0,0,0.8);
+            padding: 10px 20px;
+            border-radius: 8px;
+            letter-spacing: 2px;
+        }
+        #fullscreen-next {
+            background-color: rgba(245, 158, 11, 0.25);
+            padding: 10px 20px;
+            border-radius: 8px;
+            border: 2px solid #f59e0b;
+            font-size: 18px;
+            font-weight: 600;
+            flex: 2;
         }
     </style>
 </head>
 <body>
-    <div id="player-container">
-        <!-- Dim Overlay -->
-        <div class="dim-overlay" id="dim-overlay"></div>
-        
-        <!-- Video Area -->
-        <div id="video-container">
-            <video id="video-player" class="video-js" controls preload="auto">
-                <p class="vjs-no-js">
-                    To view this video please enable JavaScript, and consider upgrading to a
-                    web browser that <a href="https://videojs.com/html5-video-support/" target="_blank">supports HTML5 video</a>
-                </p>
-            </video>
-            
-            <!-- Info Bar -->
-            <div id="info-bar">
-                <div class="video-title">Loading...</div>
-                <div class="video-meta">Please wait</div>
-            </div>
-            
-            <!-- Control Bar -->
-            <div id="control-bar">
-                <button class="control-btn" id="playlist-toggle">
-                    <i data-feather="list"></i>
-                </button>
-                <button class="control-btn" id="play-pause">
-                    <i data-feather="play"></i>
-                </button>
-                <button class="control-btn" id="mute-toggle">
-                    <i data-feather="volume-2"></i>
-                </button>
-                <div class="progress-container" id="progress-container">
-                    <div class="progress-bar" id="progress-bar"></div>
+<div class="player-wrapper">
+    <div class="space-y-4">
+        <h1 class="text-2xl font-extrabold text-blue-accent mb-3">
+            Continuous Playlist | 5s UI updates | Duration‑based schedule
+        </h1>
+        <div id="tv-player-container">
+            <!-- FIX #1: removed crossorigin -->
+            <video id="video-player" autoplay muted playsinline controls preload="auto"></video>
+            <div id="fullscreen-overlay">
+                <div id="fullscreen-title">Now Playing</div>
+                <div id="fullscreen-info">
+                    <div id="fullscreen-now">Loading...</div>
+                    <div id="fullscreen-clock">00:00:00 AM</div>
+                    <div id="fullscreen-next">Next: Loading...</div>
                 </div>
-                <div class="time-display" id="time-display">0:00 / 0:00</div>
-                <button class="control-btn" id="settings-toggle">
-                    <i data-feather="settings"></i>
-                </button>
-                <button class="control-btn" id="fullscreen-toggle">
-                    <i data-feather="maximize"></i>
-                </button>
             </div>
-        </div>
-        
-        <!-- Playlist Sidebar -->
-        <div class="sidebar" id="playlist-sidebar">
-            <div class="sidebar-header">
-                <div class="sidebar-title">Playlist</div>
-                <button class="close-sidebar" id="close-playlist">
-                    <i data-feather="x"></i>
-                </button>
-            </div>
-            <div class="sidebar-content">
-                <div id="playlist-container">
-                    <div class="loading">Loading episodes...</div>
+            <div class="player-overlay flex justify-between">
+                <div class="self-start space-y-2 pointer-events-none">
+                    <div class="flex items-center space-x-2 pointer-events-auto">
+                        <div id="channel-id" class="info-bubble text-white text-lg">CONTINUOUS</div>
+                        <div id="channel-name" class="info-bubble text-sm">Real‑duration playlist</div>
+                    </div>
+                    <div id="now-playing-banner">
+                        Now Playing: <span id="current-show">Loading schedule...</span>
+                    </div>
+                </div>
+                <div class="self-start text-right space-y-2 pointer-events-none">
+                    <div id="player-clock" class="info-bubble text-lg !px-4">--:--:--</div>
+                    <div id="stream-status" class="info-bubble bg-green-900/50 text-green-400 border-green-400">STATUS: READY</div>
                 </div>
             </div>
         </div>
-        
-        <!-- Settings Sidebar -->
-        <div class="sidebar" id="settings-sidebar">
-            <div class="sidebar-header">
-                <div class="sidebar-title">Settings</div>
-                <button class="close-sidebar" id="close-settings">
-                    <i data-feather="x"></i>
-                </button>
+        <div class="flex flex-col sm:flex-row justify-between items-center bg-dark-card p-4 rounded-xl shadow-inner shadow-black/50">
+            <div class="flex items-center space-x-3 mb-3 sm:mb-0 w-full sm:w-auto">
+                <span class="text-lg font-semibold text-white">Volume:</span>
+                <input type="range" id="volume-slider" min="0" max="1" step="0.01" value="0.5" class="w-24 h-2 bg-gray-700 rounded-lg">
+                <span id="volume-display" class="text-blue-accent font-mono">50%</span>
             </div>
-            <div class="sidebar-content">
-                <div class="settings-group">
-                    <div class="settings-title">Playback</div>
-                    <div class="settings-option">
-                        <span class="settings-label">Quality</span>
-                        <select class="settings-control" id="quality-select">
-                            <option value="auto">Auto</option>
-                            <option value="1080">1080p</option>
-                            <option value="720">720p</option>
-                            <option value="480">480p</option>
-                            <option value="360">360p</option>
-                        </select>
-                    </div>
-                    <div class="settings-option">
-                        <span class="settings-label">Speed</span>
-                        <select class="settings-control" id="speed-select">
-                            <option value="0.5">0.5x</option>
-                            <option value="0.75">0.75x</option>
-                            <option value="1" selected>1x</option>
-                            <option value="1.25">1.25x</option>
-                            <option value="1.5">1.5x</option>
-                            <option value="2">2x</option>
-                        </select>
-                    </div>
-                </div>
-                
-                <div class="settings-group">
-                    <div class="settings-title">Audio</div>
-                    <div class="settings-option">
-                        <span class="settings-label">Volume</span>
-                        <input type="range" class="settings-control" id="volume-slider" min="0" max="100" value="100">
-                    </div>
-                </div>
-                
-                <div class="settings-group">
-                    <div class="settings-title">Interface</div>
-                    <div class="settings-option">
-                        <span class="settings-label">Debug Console</span>
-                        <label class="switch">
-                            <input type="checkbox" id="debug-toggle">
-                            <span class="slider"></span>
-                        </label>
-                    </div>
-                </div>
+            <div class="flex space-x-3">
+                <button id="stop-btn" class="info-bubble !bg-red-700 !text-white !border-red-700 hover:!bg-red-600" onclick="stopPlayback()">Stop</button>
+                <button id="refresh-btn" class="info-bubble !bg-gray-700 !text-white !border-gray-700 hover:!bg-gray-600" onclick="location.reload()">Re‑Sync</button>
+                <button id="fullscreen-btn" class="info-bubble !bg-blue-accent !text-white !border-blue-accent hover:brightness-110" onclick="toggleFullscreen()">⛶ Fullscreen</button>
             </div>
         </div>
-        
-        <!-- Debug Console -->
-        <div id="debug-console"></div>
     </div>
+    <div class="schedule-grid">
+        <h3 class="text-xl font-bold text-blue-accent mb-3 border-b border-gray-700 pb-2">24‑Hour Schedule (based on actual durations)</h3>
+        <div id="schedule-list"><div class="text-gray-500 text-sm p-4">Generating schedule...</div></div>
+    </div>
+</div>
 
-    <script>
-        // This placeholder will be replaced by the Python script
-        const EPISODES_PLACEHOLDER = '$$EPISODES_ARRAY_PLACEHOLDER$$';
+<script>
+    // ---------- PLAYLIST with actual durations (seconds) ----------
+    // Replace with your own videos and exact durations for perfect timing.
+    const playlist = [
+        { title: "Big Western Tv 379", url: "https://archive.org/download/bat-masterson-s-02-e-07-dead-men-dont-pay-debts/Bat%20Masterson%20S01E31%20Promised%20Land%201.ia.mp4", duration: 1560 },
+        { title: "Petticoat Junction S04E10 - Twenty-Five Years Too Late", url: "https://archive.org/download/Petticoat_Junction_Series/Petticoat%20Junction%20-%20Season%204/Petticoat%20Junction%20-%204x10%20-%20Twenty-Five%20Years%20Too%20Late.mp4", duration: 1500 },
+        { title: "Hogan's Heroes S03E06 Casanova Klink", url: "https://archive.org/download/hogans-heroes-s-01-e-01-the-informer_202509/Hogan%27s%20Heroes_S03E06_Casanova%20Klink.mp4", duration: 1500 },
+        { title: "Big Western Tv 1368", url: "https://archive.org/download/gunsmoke-s-16-e-01-the-noose/Gunsmoke%20S17E24%20(The%20Wedding).ia.mp4", duration: 1500 },
+        { title: "Petticoat Junction S02E35 - The Hairbrained Scheme", url: "https://archive.org/download/Petticoat_Junction_Series/Petticoat%20Junction%20-%20Season%202/Petticoat%20Junction%20-%202x35%20-%20The%20Hairbrained%20Scheme.mp4", duration: 1500 },
+        { title: "Big Western Tv 783", url: "https://archive.org/download/wagon-train-s-01-e-101-ep-101-the-willy-moran-story/Wagon%20Train_S01E137_Ep%20137%20-%20The%20John%20Wilbot%20Story.ia.mp4", duration: 1500 },
+        { title: "Big Western Tv 23", url: "https://archive.org/download/s-01.-e-17-ella-west.ia/S01.E24%20Girl%20From%20Piccadilly.ia.mp4", duration: 1500 },
+        { title: "Big Western Tv 318", url: "https://archive.org/download/s-01e-02.-point-blank/Maverick%20S05e10%20-%20Marshall%20Maverick.mp4", duration: 1500 },
+        { title: "S03E01", url: "https://archive.org/download/courage-the-cowardly-dog-1080p-ai-upscale/Courage%20the%20Cowardly%20Dog%20-%20S03E01.mp4", duration: 1320 },
+        { title: "Big Western Tv 683", url: "https://archive.org/download/tales-of-wells-fargo-s-06-e-30-royal-maroon/Tales%20of%20Wells%20Fargo%20S04E18%20The%20Easterner.ia.mp4", duration: 1500 },
+        { title: "Hogan's Heroes S03E28 The Collector General", url: "https://archive.org/download/hogans-heroes-s-01-e-01-the-informer_202509/Hogan%27s%20Heroes_S03E28_The%20Collector%20General.mp4", duration: 1500 },
+        { title: "Ancient Aliens S01E05 - The Return", url: "https://archive.org/download/ancientalienscollection/S01E05%20-%20The%20Return.mkv", duration: 2520 },
+        { title: "Big Western Tv 1575", url: "https://archive.org/download/lawman-s-03-e-24-detweilers-kid/Lawman%20S04E08%20The%20Catalog%20Woman%201.ia.mp4", duration: 1500 },
+        { title: "Big Western Tv 183", url: "https://archive.org/download/s-01.-e-17-ella-west.ia/S05E30%20Hobson's%20Choice.ia.mp4", duration: 1500 },
+        { title: "Ancient Aliens S12E01 - The Alien Hunters", url: "https://archive.org/download/ancientalienscollection/Ancient.Aliens.S12E01.The.Alien.Hunters.1080p.Hulu.WEB-DL.AAC2.0.H.264-QOQ.mkv", duration: 2520 },
+        { title: "Big Western Tv 863", url: "https://archive.org/download/wagon-train-s-01-e-101-ep-101-the-willy-moran-story/Wagon%20Train_S04E03_The%20Albert%20Farnsworth%20Story%201.ia.mp4", duration: 1500 },
+        { title: "Ancient Aliens S19E04", url: "https://archive.org/download/09.-most-beautiful-soft-rock-love-songs-80s-90s-soft-rock-ballads-70s-80s-90s-ol/Ancient%20Aliens%20Season%2019%201080p%20WEBRip%20x265%20An0mal1/Ancient.Aliens.S19E04.1080p.WEBRip.x265-An0mal1.mkv", duration: 2520 },
+        { title: "Big Western Tv 1587", url: "https://archive.org/download/lawman-s-03-e-24-detweilers-kid/Lawman%20S04E39%20Jailbreak%201.ia.mp4", duration: 1500 },
+        { title: "Big Western Tv 371", url: "https://archive.org/download/bat-masterson-s-02-e-07-dead-men-dont-pay-debts/Bat%20Masterson%20S01E23%20The%20Tumbleweed%20Wagon%201.ia.mp4", duration: 1500 },
+        { title: "Big Western Tv 1058", url: "https://archive.org/download/branded-s-02-e-22-barbed-wire_202405/Branded%20S01E16%20Price%20of%20a%20Name.mp4", duration: 1500 },
+        { title: "Big Western Tv 1279", url: "https://archive.org/download/naked-city-s-01-e-01-meridian/Naked%20City%20S04E19%20Beyond%20This%20Place%20There%20Be%20Dragons.mp4", duration: 1500 },
+        { title: "S01E12 - Shirley the Medium", url: "https://archive.org/download/courage-the-cowardly-dog-1080p-ai-upscale/Courage%20the%20Cowardly%20Dog%20-%2001x12%20-%20Shirley%20the%20Medium.mp4", duration: 1320 },
+        { title: "Big Western Tv 705", url: "https://archive.org/download/tales-of-wells-fargo-s-06-e-30-royal-maroon/Tales%20of%20Wells%20Fargo%20S05E03%20Doc%20Dawson.ia.mp4", duration: 1500 },
+        { title: "S01E08 - Freaky Fred", url: "https://archive.org/download/courage-the-cowardly-dog-1080p-ai-upscale/Courage%20the%20Cowardly%20Dog%20-%2001x08%20-%20Freaky%20Fred.mp4", duration: 1320 }
+    ];
 
-        // Player state
-        let playerState = {
-            currentEpisode: 0,
-            isPlaying: false,
-            isMuted: false,
-            volume: 1,
-            playbackRate: 1,
-            quality: 'auto',
-            favorites: [],
-            history: [],
-            debugMode: false
-        };
-
-        // DOM Elements
-        const videoPlayer = document.getElementById('video-player');
-        const playlistSidebar = document.getElementById('playlist-sidebar');
-        const settingsSidebar = document.getElementById('settings-sidebar');
-        const dimOverlay = document.getElementById('dim-overlay');
-        const playlistContainer = document.getElementById('playlist-container');
-        const debugConsole = document.getElementById('debug-console');
-        
-        // Control buttons
-        const playlistToggle = document.getElementById('playlist-toggle');
-        const settingsToggle = document.getElementById('settings-toggle');
-        const closePlaylist = document.getElementById('close-playlist');
-        const closeSettings = document.getElementById('close-settings');
-        const playPauseBtn = document.getElementById('play-pause');
-        const muteToggleBtn = document.getElementById('mute-toggle');
-        const fullscreenToggle = document.getElementById('fullscreen-toggle');
-        const progressContainer = document.getElementById('progress-container');
-        const progressBar = document.getElementById('progress-bar');
-        const timeDisplay = document.getElementById('time-display');
-        const debugToggle = document.getElementById('debug-toggle');
-        
-        // Settings controls
-        const qualitySelect = document.getElementById('quality-select');
-        const speedSelect = document.getElementById('speed-select');
-        const volumeSlider = document.getElementById('volume-slider');
-
-        // Initialize player
-        function initPlayer() {
-            // Check if episodes data is available
-            if (typeof episodes === 'undefined' || episodes.length === 0) {
-                console.error('No episodes data found');
-                document.querySelector('.video-title').textContent = 'No episodes available';
-                document.querySelector('.video-meta').textContent = 'Check your RSS feed';
-                playlistContainer.innerHTML = '<div class="loading">No episodes found in RSS feed</div>';
-                return;
-            }
-
-            // Initialize video.js player
-            const player = videojs('video-player', {
-                controls: false,
-                autoplay: false,
-                preload: 'auto',
-                responsive: true,
-                fluid: true
+    // ---------- SCHEDULE GENERATOR (cumulative durations from midnight) ----------
+    function generate24hrSchedule() {
+        let schedule = [];
+        let currentMinutes = 0;
+        const startOfDay = new Date();
+        startOfDay.setHours(0, 0, 0, 0);
+        let index = 0;
+        while (currentMinutes < 24 * 60) {
+            const item = playlist[index % playlist.length];
+            const startMins = currentMinutes;
+            const endMins = currentMinutes + (item.duration / 60);
+            const startDate = new Date(startOfDay.getTime() + startMins * 60000);
+            const startFormatted = startDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+            schedule.push({
+                title: item.title,
+                startTime: startFormatted,
+                startMinutes: startMins,
+                endMinutes: endMins,
+                url: item.url,
+                playlistIndex: index % playlist.length
             });
-
-            // Populate playlist
-            renderPlaylist();
-            
-            // Load first episode
-            if (episodes.length > 0) {
-                loadEpisode(0);
-            }
-            
-            // Initialize event listeners
-            initEventListeners();
-            
-            // Initialize icons
-            feather.replace();
-            
-            // Log initialization
-            logToConsole(`Player initialized with ${episodes.length} episodes`);
+            currentMinutes = endMins;
+            index++;
         }
+        return schedule;
+    }
 
-        // Render playlist
-        function renderPlaylist() {
-            playlistContainer.innerHTML = '';
-            
-            episodes.forEach((episode, index) => {
-                const item = document.createElement('div');
-                item.className = 'playlist-item';
-                if (index === playerState.currentEpisode) {
-                    item.classList.add('active');
-                }
-                
-                // Use episode data structure from RSS feed
-                const title = episode.title || `Episode ${index + 1}`;
-                const size = episode.size || '';
-                const thumbnail = episode.thumbnail || `https://placehold.co/80x45/333/fff?text=${encodeURIComponent(title.substring(0, 10))}`;
-                
-                item.innerHTML = `
-                    <div class="playlist-thumb" style="background-image: url('${thumbnail}')"></div>
-                    <div class="playlist-info">
-                        <div class="playlist-title">${title}</div>
-                        <div class="playlist-duration">${size}</div>
-                    </div>
-                `;
-                
-                item.addEventListener('click', () => {
-                    loadEpisode(index);
-                    closeSidebars();
-                });
-                
-                playlistContainer.appendChild(item);
-            });
+    let fullSchedule = generate24hrSchedule();
+    let currentVideoIndex = 0;       // index in playlist
+    let currentScheduleIndex = -1;    // index in fullSchedule (for UI)
+    let hls = null;
+    const videoPlayer = document.getElementById('video-player');
+
+    // ---------- LOAD STREAM (fix #2: no double load) ----------
+    function loadStream(url, playlistIdx) {
+        if (hls) {
+            hls.destroy();
+            hls = null;
         }
+        videoPlayer.pause();
+        videoPlayer.removeAttribute('src');   // clear previous source
+        videoPlayer.muted = true;              // ensure autoplay
+        videoPlayer.src = url;
+        videoPlayer.load();                    // single load
+        videoPlayer.play().catch(e => console.warn("Autoplay prevented:", e));
+        currentVideoIndex = playlistIdx;
+        // Immediately refresh UI to show new show (since video end triggers this)
+        updateNowPlaying(true);
+        // Update status
+        document.getElementById('stream-status').textContent = 'STATUS: PLAYING';
+        document.getElementById('stream-status').className = 'info-bubble bg-green-900/50 text-green-400 border-green-400';
+    }
 
-        // Load episode
-        function loadEpisode(index) {
-            if (index < 0 || index >= episodes.length) return;
-            
-            const episode = episodes[index];
-            playerState.currentEpisode = index;
-            
-            // Update UI
-            document.querySelectorAll('.playlist-item').forEach((item, i) => {
-                if (i === index) {
-                    item.classList.add('active');
-                } else {
-                    item.classList.remove('active');
-                }
-            });
-            
-            // Update info bar
-            document.querySelector('.video-title').textContent = episode.title || `Episode ${index + 1}`;
-            document.querySelector('.video-meta').textContent = episode.size ? `Size: ${episode.size}` : `Season ${episode.season || 1}`;
-            
-            // Load video source
-            const player = videojs('video-player');
-            
-            // Clear previous sources
-            player.src('');
-            
-            // Determine best source - use file URL from RSS feed
-            let source = {};
-            const fileUrl = episode.file;
-            
-            if (!fileUrl) {
-                logToConsole('No video file URL found for this episode');
-                return;
-            }
-            
-            // Detect source type by extension
-            if (fileUrl.includes('.m3u8')) {
-                source = {
-                    src: fileUrl,
-                    type: 'application/x-mpegURL'
-                };
-            } else if (fileUrl.includes('.mpd')) {
-                source = {
-                    src: fileUrl,
-                    type: 'application/dash+xml'
-                };
-            } else if (fileUrl.includes('.mp4')) {
-                source = {
-                    src: fileUrl,
-                    type: 'video/mp4'
-                };
-            } else {
-                // Default to MP4 if we can't determine
-                source = {
-                    src: fileUrl,
-                    type: 'video/mp4'
-                };
-            }
-            
-            player.src(source);
-            player.load();
-            
-            // Add to history
-            addToHistory(episode.id || index);
-            
-            // Log episode load
-            logToConsole(`Loaded episode: ${episode.title || `Episode ${index + 1}`}`);
-        }
+    // Auto-advance when video ends (continuous playlist loop)
+    videoPlayer.onended = () => {
+        console.log("Video ended – advancing to next show");
+        const nextPlaylistIdx = (currentVideoIndex + 1) % playlist.length;
+        loadStream(playlist[nextPlaylistIdx].url, nextPlaylistIdx);
+    };
 
-        // Initialize event listeners
-        function initEventListeners() {
-            // Sidebar toggles
-            playlistToggle.addEventListener('click', () => toggleSidebar('playlist'));
-            settingsToggle.addEventListener('click', () => toggleSidebar('settings'));
-            closePlaylist.addEventListener('click', () => closeSidebars());
-            closeSettings.addEventListener('click', () => closeSidebars());
-            dimOverlay.addEventListener('click', () => closeSidebars());
-            
-            // Play/Pause
-            playPauseBtn.addEventListener('click', togglePlayPause);
-            
-            // Mute/Unmute
-            muteToggleBtn.addEventListener('click', toggleMute);
-            
-            // Fullscreen
-            fullscreenToggle.addEventListener('click', toggleFullscreen);
-            
-            // Progress bar
-            progressContainer.addEventListener('click', seekVideo);
-            
-            // Settings controls
-            qualitySelect.addEventListener('change', (e) => {
-                playerState.quality = e.target.value;
-                logToConsole(`Quality changed to: ${e.target.value}`);
-            });
-            
-            speedSelect.addEventListener('change', (e) => {
-                const speed = parseFloat(e.target.value);
-                playerState.playbackRate = speed;
-                videojs('video-player').playbackRate(speed);
-                logToConsole(`Playback speed changed to: ${speed}x`);
-            });
-            
-            volumeSlider.addEventListener('input', (e) => {
-                const volume = e.target.value / 100;
-                playerState.volume = volume;
-                videojs('video-player').volume(volume);
-                
-                // Update mute button if needed
-                if (volume === 0 && !playerState.isMuted) {
-                    toggleMute();
-                } else if (volume > 0 && playerState.isMuted) {
-                    toggleMute();
-                }
-                
-                logToConsole(`Volume changed to: ${Math.round(volume * 100)}%`);
-            });
-            
-            // Debug toggle
-            debugToggle.addEventListener('change', (e) => {
-                playerState.debugMode = e.target.checked;
-                debugConsole.classList.toggle('active', e.target.checked);
-                logToConsole(`Debug mode ${e.target.checked ? 'enabled' : 'disabled'}`);
-            });
-            
-            // Video events
-            const player = videojs('video-player');
-            
-            player.on('play', () => {
-                playerState.isPlaying = true;
-                updatePlayPauseButton();
-                logToConsole('Video playing');
-            });
-            
-            player.on('pause', () => {
-                playerState.isPlaying = false;
-                updatePlayPauseButton();
-                logToConsole('Video paused');
-            });
-            
-            player.on('timeupdate', updateProgress);
-            
-            player.on('loadedmetadata', () => {
-                updateProgress();
-                logToConsole('Video metadata loaded');
-            });
-            
-            player.on('volumechange', () => {
-                const currentVolume = player.volume();
-                if (currentVolume !== playerState.volume) {
-                    playerState.volume = currentVolume;
-                    volumeSlider.value = currentVolume * 100;
-                    updateMuteButton();
-                }
-            });
-            
-            // Prevent default touch behaviors for Weebly compatibility
-            document.addEventListener('touchstart', handleTouch, { passive: false });
-            document.addEventListener('touchmove', handleTouch, { passive: false });
-        }
+    // Handle errors
+    videoPlayer.onerror = (e) => {
+        console.error("Video error:", videoPlayer.error);
+        document.getElementById('stream-status').textContent = 'STATUS: ERROR';
+        document.getElementById('stream-status').className = 'info-bubble bg-red-900/50 text-red-400 border-red-400';
+    };
 
-        // Toggle sidebar
-        function toggleSidebar(sidebar) {
-            const isPlaylist = sidebar === 'playlist';
-            const targetSidebar = isPlaylist ? playlistSidebar : settingsSidebar;
-            const otherSidebar = isPlaylist ? settingsSidebar : playlistSidebar;
-            
-            if (targetSidebar.classList.contains('active')) {
-                closeSidebars();
-            } else {
-                // Close other sidebar first
-                otherSidebar.classList.remove('active');
-                // Open target sidebar
-                targetSidebar.classList.add('active');
-                dimOverlay.classList.add('active');
+    // ---------- UI UPDATE (every 5 seconds, no memory bloat) ----------
+    function updateNowPlaying(force = false) {
+        const now = new Date();
+        const currentMinutes = now.getHours() * 60 + now.getMinutes() + now.getSeconds() / 60;
+        let activeIdx = -1;
+        for (let i = 0; i < fullSchedule.length; i++) {
+            const s = fullSchedule[i];
+            // Midnight rollover handled because endMinutes may be < startMinutes (but our generator doesn't cross midnight? It may if total duration > 24h – but we generate exactly 24h)
+            // Since we stop at 24h, endMinutes is always > startMinutes except the last item might end exactly at 24h.
+            if (currentMinutes >= s.startMinutes && currentMinutes < s.endMinutes) {
+                activeIdx = i;
+                break;
             }
         }
+        // If none found (e.g., exactly at 24:00), default to last item
+        if (activeIdx === -1 && fullSchedule.length > 0) activeIdx = fullSchedule.length - 1;
 
-        // Close all sidebars
-        function closeSidebars() {
-            playlistSidebar.classList.remove('active');
-            settingsSidebar.classList.remove('active');
-            dimOverlay.classList.remove('active');
-        }
-
-        // Toggle play/pause
-        function togglePlayPause() {
-            const player = videojs('video-player');
-            if (playerState.isPlaying) {
-                player.pause();
-            } else {
-                player.play();
+        if (activeIdx !== -1) {
+            // Update schedule highlight
+            document.querySelectorAll('.schedule-item').forEach(el => el.classList.remove('active'));
+            const activeEl = document.getElementById(`schedule-item-${activeIdx}`);
+            if (activeEl) activeEl.classList.add('active');
+            // Update now playing text
+            const currentShow = fullSchedule[activeIdx].title;
+            document.getElementById('current-show').textContent = currentShow;
+            document.getElementById('fullscreen-now').textContent = currentShow;
+            // Update next show info
+            const nextIdx = (activeIdx + 1) % fullSchedule.length;
+            const nextShow = fullSchedule[nextIdx];
+            document.getElementById('fullscreen-next').innerHTML = `Next: ${nextShow.title} @ ${nextShow.startTime}`;
+            // Auto-scroll only if force or index changed (optional)
+            if (force || activeIdx !== currentScheduleIndex) {
+                const el = document.getElementById(`schedule-item-${activeIdx}`);
+                if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                currentScheduleIndex = activeIdx;
             }
+        } else {
+            document.getElementById('current-show').textContent = "Schedule syncing...";
         }
 
-        // Update play/pause button
-        function updatePlayPauseButton() {
-            const icon = playPauseBtn.querySelector('i');
-            if (playerState.isPlaying) {
-                icon.setAttribute('data-feather', 'pause');
-            } else {
-                icon.setAttribute('data-feather', 'play');
-            }
-            feather.replace();
-        }
+        // Update clocks
+        const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        document.getElementById('player-clock').textContent = timeStr;
+        const fsClock = document.getElementById('fullscreen-clock');
+        if (fsClock) fsClock.textContent = timeStr;
+    }
 
-        // Toggle mute
-        function toggleMute() {
-            const player = videojs('video-player');
-            playerState.isMuted = !playerState.isMuted;
-            player.muted(playerState.isMuted);
-            updateMuteButton();
-            
-            logToConsole(`Audio ${playerState.isMuted ? 'muted' : 'unmuted'}`);
-        }
+    // ---------- RENDER SCHEDULE UI ----------
+    function renderScheduleUI() {
+        const container = document.getElementById('schedule-list');
+        container.innerHTML = '';
+        fullSchedule.forEach((item, idx) => {
+            const div = document.createElement('div');
+            div.className = 'schedule-item';
+            div.id = `schedule-item-${idx}`;
+            div.onclick = () => {
+                // Manual jump to that show
+                loadStream(item.url, item.playlistIndex);
+            };
+            // You can add thumbnails if available
+            div.innerHTML = `
+                <span class="time-label">${item.startTime}</span>
+                <span class="title-label">${item.title}</span>
+            `;
+            container.appendChild(div);
+        });
+    }
 
-        // Update mute button
-        function updateMuteButton() {
-            const icon = muteToggleBtn.querySelector('i');
-            const player = videojs('video-player');
-            
-            if (player.muted() || player.volume() === 0) {
-                icon.setAttribute('data-feather', 'volume-x');
-            } else if (player.volume() < 0.5) {
-                icon.setAttribute('data-feather', 'volume-1');
-            } else {
-                icon.setAttribute('data-feather', 'volume-2');
-            }
-            
-            feather.replace();
-        }
+    // ---------- VOLUME CONTROL ----------
+    const volumeSlider = document.getElementById('volume-slider');
+    const volumeDisplay = document.getElementById('volume-display');
+    function updateVolume() {
+        videoPlayer.volume = volumeSlider.value;
+        const percent = Math.round(volumeSlider.value * 100);
+        volumeDisplay.textContent = `${percent}%`;
+        if (volumeSlider.value == 0) videoPlayer.muted = true;
+        else videoPlayer.muted = false;
+    }
+    volumeSlider.addEventListener('input', updateVolume);
+    videoPlayer.volume = 0.5;
+    updateVolume();
 
-        // Toggle fullscreen
-        function toggleFullscreen() {
-            if (!document.fullscreenElement) {
-                document.documentElement.requestFullscreen().catch(err => {
-                    logToConsole(`Error attempting to enable fullscreen: ${err.message}`);
-                });
-            } else {
-                if (document.exitFullscreen) {
-                    document.exitFullscreen();
-                }
-            }
+    // ---------- CONTROL FUNCTIONS ----------
+    window.stopPlayback = function() {
+        videoPlayer.pause();
+        if (hls) { hls.destroy(); hls = null; }
+        videoPlayer.src = '';
+        document.getElementById('stream-status').textContent = 'STATUS: STOPPED';
+        document.getElementById('stream-status').className = 'info-bubble bg-red-900/50 text-red-400 border-red-400';
+    };
+    window.toggleFullscreen = function() {
+        const container = document.getElementById('tv-player-container');
+        if (!document.fullscreenElement) {
+            container.requestFullscreen().catch(err => console.error(err));
+        } else {
+            document.exitFullscreen();
         }
+    };
 
-        // Update progress bar
-        function updateProgress() {
-            const player = videojs('video-player');
-            const currentTime = player.currentTime();
-            const duration = player.duration();
-            
-            if (duration > 0) {
-                const progressPercent = (currentTime / duration) * 100;
-                progressBar.style.width = `${progressPercent}%`;
-                
-                // Update time display
-                const currentTimeFormatted = formatTime(currentTime);
-                const durationFormatted = formatTime(duration);
-                timeDisplay.textContent = `${currentTimeFormatted} / ${durationFormatted}`;
-            }
-        }
-
-        // Seek video
-        function seekVideo(e) {
-            const player = videojs('video-player');
-            const progressContainerRect = progressContainer.getBoundingClientRect();
-            const clickPosition = (e.clientX - progressContainerRect.left) / progressContainerRect.width;
-            const seekTime = clickPosition * player.duration();
-            
-            player.currentTime(seekTime);
-        }
-
-        // Format time (seconds to MM:SS)
-        function formatTime(seconds) {
-            const mins = Math.floor(seconds / 60);
-            const secs = Math.floor(seconds % 60);
-            return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
-        }
-
-        // Add to history
-        function addToHistory(episodeId) {
-            // Avoid duplicates
-            playerState.history = playerState.history.filter(id => id !== episodeId);
-            playerState.history.unshift(episodeId);
-            
-            // Keep only last 10 items
-            if (playerState.history.length > 10) {
-                playerState.history.pop();
-            }
-            
-            logToConsole(`Added episode ${episodeId} to history`);
-        }
-
-        // Log to debug console
-        function logToConsole(message) {
-            if (playerState.debugMode) {
-                const timestamp = new Date().toLocaleTimeString();
-                debugConsole.innerHTML += `[${timestamp}] ${message}<br>`;
-                debugConsole.scrollTop = debugConsole.scrollHeight;
-            }
-        }
-
-        // Handle touch events for Weebly compatibility
-        function handleTouch(e) {
-            // Prevent default only for specific elements to avoid interference
-            if (e.target.closest('.sidebar') || e.target.closest('#control-bar')) {
-                e.preventDefault();
-            }
-        }
-
-        // Initialize when DOM is loaded
-        document.addEventListener('DOMContentLoaded', initPlayer);
-    </script>
+    // ---------- INIT ----------
+    function init() {
+        renderScheduleUI();
+        // Start playing first video
+        loadStream(playlist[0].url, 0);
+        // UI updates every 5 seconds (lightweight)
+        setInterval(updateNowPlaying, 5000);
+        // Also update immediately
+        updateNowPlaying();
+    }
+    init();
+</script>
 </body>
 </html>
