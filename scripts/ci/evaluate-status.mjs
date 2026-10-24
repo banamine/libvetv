@@ -14,6 +14,9 @@ export function evaluateStatus(input) {
   if (generateResult !== "success") return fail("generate_skipped_unexpected");
   const gateExpected = (eventName === "schedule" && publishEnabled !== "true") || !input.baseUrlPresent;
   if (gated !== gateExpected) return fail("gate_unexpected");
+  if (!gated && input.artifactResult !== "success") {
+    return fail(`artifact_${input.artifactResult || "missing"}`);
+  }
   if (!gated && !["0", "3"].includes(String(exitCode))) return fail("generator_exit_invalid");
   if (!gated && !["true", "false"].includes(String(changed))) return fail("changed_output_missing");
   const publishingExpected = active && !gated && String(changed) === "true";
@@ -70,7 +73,8 @@ async function main() {
     eventName: env.EVENT_NAME, ref: env.RUN_REF, publishEnabled: env.PUBLISH_ENABLED,
     dryRun: env.DRY_RUN, baseUrlPresent: env.BASE_URL_PRESENT === "true",
     generateResult: env.GENERATE_RESULT, gated: env.GATED, exitCode: env.EXIT_CODE,
-    changed: env.CHANGED, publishResult: env.PUBLISH_RESULT, deployResult: env.DEPLOY_RESULT,
+    changed: env.CHANGED, artifactResult: env.ARTIFACT_RESULT,
+    publishResult: env.PUBLISH_RESULT, deployResult: env.DEPLOY_RESULT,
   });
   const summary = await statusSummary(process.cwd(), decision);
   if (env.GITHUB_STEP_SUMMARY) await appendFile(env.GITHUB_STEP_SUMMARY, summary);

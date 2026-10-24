@@ -14,11 +14,11 @@ const ROOT = resolve(import.meta.dirname, "../..");
 const publishing = {
   eventName: "schedule", ref: "refs/heads/main", publishEnabled: "true",
   dryRun: false, baseUrlPresent: true, generateResult: "success", gated: "false",
-  exitCode: "0", changed: "true", publishResult: "success", deployResult: "success",
+  exitCode: "0", changed: "true", artifactResult: "success", publishResult: "success", deployResult: "success",
 };
 
 const statusCases = [
-  ["disabled schedule", { publishEnabled: "", gated: "true", exitCode: "", changed: "", publishResult: "skipped", deployResult: "skipped" }, true, "gated"],
+  ["disabled schedule", { publishEnabled: "", gated: "true", exitCode: "", changed: "", artifactResult: "skipped", publishResult: "skipped", deployResult: "skipped" }, true, "gated"],
   ["dry run changes", { eventName: "workflow_dispatch", dryRun: true, publishResult: "skipped", deployResult: "skipped" }, true, "publication_not_required"],
   ["publish and deploy success", {}, true, "published"],
   ["unexpected publish skip", { publishResult: "skipped" }, false, "publish_skipped"],
@@ -35,10 +35,11 @@ const statusCases = [
   ["unexpected gate", { gated: "true" }, false, "gate_unexpected"],
   ["missing exit code", { exitCode: "" }, false, "generator_exit_invalid"],
   ["missing changed output", { changed: "" }, false, "changed_output_missing"],
+  ["artifact download failure", { artifactResult: "failure", publishResult: "skipped", deployResult: "skipped" }, false, "artifact_failure"],
   ["branch manual run cannot publish", { eventName: "workflow_dispatch", ref: "refs/heads/build/demo", publishResult: "skipped", deployResult: "skipped" }, true, "publication_not_required"],
   ["disabled manual run is dry", { eventName: "workflow_dispatch", publishEnabled: "", publishResult: "skipped", deployResult: "skipped" }, true, "publication_not_required"],
   ["unexpected publish in dry run", { eventName: "workflow_dispatch", dryRun: true }, false, "publish_unexpected"],
-  ["dry missing URL is deliberate gate", { eventName: "workflow_dispatch", dryRun: true, baseUrlPresent: false, gated: "true", exitCode: "", changed: "", publishResult: "skipped", deployResult: "skipped" }, true, "gated"],
+  ["dry missing URL is deliberate gate", { eventName: "workflow_dispatch", dryRun: true, baseUrlPresent: false, gated: "true", exitCode: "", changed: "", artifactResult: "skipped", publishResult: "skipped", deployResult: "skipped" }, true, "gated"],
 ];
 for (const [name, overrides, ok, reason] of statusCases) {
   test(`workflow status: ${name}`, () => {
@@ -141,7 +142,7 @@ test("status CLI exits nonzero for partial results even after successful publish
     cwd: root, encoding: "utf8", env: { ...process.env,
       EVENT_NAME: "schedule", RUN_REF: "refs/heads/main", PUBLISH_ENABLED: "true", DRY_RUN: "false",
       BASE_URL_PRESENT: "true", GENERATE_RESULT: "success", GATED: "false", EXIT_CODE: "3",
-      CHANGED: "true", PUBLISH_RESULT: "success", DEPLOY_RESULT: "success",
+      CHANGED: "true", ARTIFACT_RESULT: "success", PUBLISH_RESULT: "success", DEPLOY_RESULT: "success",
       GITHUB_STEP_SUMMARY: join(root, "summary"),
     },
   });
