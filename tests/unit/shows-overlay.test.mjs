@@ -142,6 +142,21 @@ test("separate calendar dates with the same weekday are separate sets and fall b
   assert.deepEqual(selected.shows[0].segments.map((part) => part.name), ["Mon-Alex-Hr1-Seg1.mp4"]);
 });
 
+test("AJN files straddling 00:00 UTC form two date sets and are not stitched together", () => {
+  const selected = select([
+    row("Mon-Alex-Hr1-Seg1.mp4", "1 GB", "Oct 19 2026 11:58 PM"),
+    row("Mon-Alex-Hr1-Seg2.mp4", "1 GB", "Oct 19 2026 11:59 PM"),
+    row("Mon-Alex-Hr1-Seg1.mp4", "1 GB", "Oct 20 2026 12:01 AM"),
+    row("Mon-Alex-Hr1-Seg2.mp4", "1 GB", "Oct 20 2026 12:02 AM"),
+  ]);
+  assert.equal(selected.shows.length, 1);
+  assert.equal(selected.shows[0].date, "2026-10-20");
+  assert.deepEqual(selected.shows[0].segments.map((part) => part.name), [
+    "Mon-Alex-Hr1-Seg1.mp4", "Mon-Alex-Hr1-Seg2.mp4",
+  ]);
+  assert.equal(selected.shows[0].fallbackFromDay, undefined);
+});
+
 for (const [label, rows] of [
   ["missing hour 1", [row("Mon-Alex-Hr2-Seg1.mp4")]],
   ["missing segment 1", [row("Mon-Alex-Hr1-Seg2.mp4")]],
