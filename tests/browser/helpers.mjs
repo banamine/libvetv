@@ -12,6 +12,7 @@ const MEDIA = {
   red: await readFile(resolve(MEDIA_ROOT, "red.mp4")),
   blue: await readFile(resolve(MEDIA_ROOT, "blue.mp4")),
   green: await readFile(resolve(MEDIA_ROOT, "green.mp4")),
+  long: await readFile(resolve(MEDIA_ROOT, "long.mp4")),
 };
 
 export const BASELINE_HTML = execFileSync(
@@ -25,8 +26,12 @@ export async function readIndexFixture() {
 }
 
 function mediaForPath(pathname) {
+  if (pathname.endsWith("/long.mp4")) return MEDIA.long;
   if (pathname.endsWith("/blue.mp4")) return MEDIA.blue;
   if (pathname.endsWith("/green.mp4")) return MEDIA.green;
+  if (pathname.endsWith("/red.mp4")) return MEDIA.red;
+  if (pathname.endsWith("Seg2.mp4")) return MEDIA.green;
+  if (pathname.endsWith("Seg1.mp4")) return MEDIA.long;
   return MEDIA.red;
 }
 
@@ -63,22 +68,37 @@ function rangeResponse(buffer, rangeHeader) {
 
 export async function installLocalNetwork(page, {
   failEncoded = true,
+  failPaths = [],
   encodedDelayMs = 0,
+  mediaResolver = mediaForPath,
   indexOverride = null,
+  indexStatus = 200,
   manifestOverrides = {},
+  digestStatus = 200,
+  digestBody = { stories: [] },
 } = {}) {
   const stats = {
     dailyPaths: [],
+    indexRequests: 0,
     archivePaths: [],
     blockedExistingCdn: [],
     unroutedExternal: [],
     localPaths: [],
+    digestPaths: [],
   };
 
   await page.route("**/*", async (route) => {
     const requestUrl = new URL(route.request().url());
     if (requestUrl.origin === BASE_URL) {
       stats.localPaths.push(requestUrl.pathname);
+      if (requestUrl.pathname === "/Daily-News-Digest-/data/current/data.json") {
+        stats.digestPaths.push(requestUrl.pathname);
+        await route.fulfill({
+          status: digestStatus, contentType: "application/json",
+          body: typeof digestBody === "string" ? digestBody : JSON.stringify(digestBody),
+        });
+        return;
+      }
       if (requestUrl.pathname === "/__baseline__") {
         await route.fulfill({ status: 200, contentType: "text/html; charset=utf-8", body: BASELINE_HTML });
         return;
@@ -89,9 +109,21 @@ export async function installLocalNetwork(page, {
         try {
           const fixturePath = resolve(DAILY_ROOT, `.${requestUrl.pathname.slice("/daily".length)}`);
           if (requestUrl.pathname === "/daily/latest/index.json" && indexOverride) {
-            body = Buffer.from(JSON.stringify(indexOverride));
+            stats.indexRequests += 1;
+            const responseStatus = typeof indexStatus === "function" ? await indexStatus() : indexStatus;
+            if (responseStatus !== 200) {
+              await route.fulfill({
+                status: responseStatus, contentType: "application/json; charset=utf-8",
+                body: JSON.stringify({ error: "DEMO synthetic index failure" }),
+              });
+              return;
+            }
+            const index = typeof indexOverride === "function" ? await indexOverride() : indexOverride;
+            body = Buffer.from(JSON.stringify(index));
           } else if (manifestOverrides[requestUrl.pathname]) {
-            body = Buffer.from(JSON.stringify(manifestOverrides[requestUrl.pathname]));
+            const manifest = typeof manifestOverrides[requestUrl.pathname] === "function"
+              ? await manifestOverrides[requestUrl.pathname]() : manifestOverrides[requestUrl.pathname];
+            body = Buffer.from(JSON.stringify(manifest));
           } else {
             body = await readFile(fixturePath);
           }
@@ -109,9 +141,11 @@ export async function installLocalNetwork(page, {
       return;
     }
 
-    if (requestUrl.hostname === "archive.org") {
+    if (requestUrl.hostname === "archive.org" || requestUrl.hostname === "affiliates.alexjoneslive.com") {
       stats.archivePaths.push(requestUrl.pathname);
-      if (requestUrl.pathname.includes("My%20Movie.mp4") && failEncoded) {
+      if ((requestUrl.pathname.includes("My%20Movie.mp4") ||
+           failPaths.some((path) => requestUrl.pathname.endsWith(path))) &&
+          (typeof failEncoded === "function" ? failEncoded() : failEncoded)) {
         if (encodedDelayMs > 0) await new Promise((resolveDelay) => setTimeout(resolveDelay, encodedDelayMs));
         try {
           await route.abort("failed");
@@ -124,7 +158,7 @@ export async function installLocalNetwork(page, {
         await route.fulfill({ status: 200, contentType: "text/vtt", body: "WEBVTT\n\n" });
         return;
       }
-      const media = mediaForPath(requestUrl.pathname);
+      const media = mediaResolver(requestUrl.pathname, MEDIA);
       const ranged = rangeResponse(media, route.request().headers().range);
       await route.fulfill({
         status: ranged.status,

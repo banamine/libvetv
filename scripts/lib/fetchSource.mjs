@@ -86,7 +86,7 @@ function isPublicAddress(address) {
   return false;
 }
 
-async function assertPublicDns(hostname, lookupImpl = lookup) {
+export async function assertPublicDns(hostname, lookupImpl = lookup) {
   let addresses;
   try {
     addresses = await lookupImpl(hostname, { all: true, verbatim: true });

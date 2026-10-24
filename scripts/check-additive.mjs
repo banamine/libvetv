@@ -33,7 +33,9 @@ export function checkAdditive({ baseBytes, currentBytes, numstat }) {
   if (stripped.includes(BEGIN) || stripped.includes(END)) {
     throw new Error("marker_blocks_unmatched");
   }
-  const baseHash = createHash("sha256").update(baseText, "utf8").digest("hex");
+  // After the feature merges, origin/main contains the same marker blocks.
+  // Compare the preserved page on both sides, not feature markup to stripped markup.
+  const baseHash = createHash("sha256").update(baseText.replace(BLOCK, ""), "utf8").digest("hex");
   const strippedHash = createHash("sha256").update(stripped, "utf8").digest("hex");
   if (baseHash !== strippedHash) throw new Error("index_html_base_mismatch");
   return { deletedLines: deleted, markerBlocks: blocks.length, baseHash };

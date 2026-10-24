@@ -44,6 +44,11 @@ export function assignLocalIds(items, hashUrl = sha256Prefix) {
     const urlForId = urlById.get(localId);
     if (urlForId !== undefined && urlForId !== url) throw new IdCollisionError();
     urlById.set(localId, url);
-    return { ...item, localId };
+    return {
+      ...item, localId,
+      ...(item.kind === "show" ? {
+        segments: assignLocalIds(item.segments, hashUrl).map((segment, index) => ({ ...segment, seq: index + 1 })),
+      } : {}),
+    };
   });
 }

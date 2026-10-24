@@ -4,17 +4,38 @@
   "toleranceSeconds": 900,
   "maxSourceAgeSeconds": 86400,
   "maxFutureSkewSeconds": 300,
+  "sources": [
+    {
+      "id": "ajn-affiliate-segments",
+      "type": "affiliate-listing",
+      "listUrl": "https://www.alexjoneslive.com/affiliates/mp4-segs/",
+      "fileBase": "https://affiliates.alexjoneslive.com/mp4-segs/",
+      "network": "ajn",
+      "loop": true,
+      "mediaAllowlist": [
+        { "host": "archive.org", "prefix": "/download/" },
+        { "host": "affiliates.alexjoneslive.com", "prefix": "/mp4-segs/" }
+      ],
+      "shows": {
+        "Alex": "The Alex Jones Show",
+        "WarRoom": "War Room with Harrison Smith",
+        "SundayLive": "Sunday Night Live"
+      }
+    }
+  ],
   "channels": [
     {
       "id": "classic-cinema",
       "guideId": "movies-classics-vault",
       "label": "Cinema Classics Vault",
+      "network": "Cinema Classics Vault",
       "enabled": true
     },
     {
       "id": "ajn-infowars-nightly-news",
       "guideId": "cable-tv",
       "label": "Infowars Nightly News (archive)",
+      "network": "Infowars",
       "enabled": true
     }
   ]

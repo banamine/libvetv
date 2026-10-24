@@ -10,6 +10,14 @@ import { setTextContent } from "../../assets/daily-playlist.js";
 
 const BASE_URL = "https://example.invalid/libvetv/";
 
+test("additive check accepts an already-featured base but still rejects preserved-page edits", () => {
+  const page = "<html>\n<!-- DAILY-PLAYLIST:BEGIN -->\n<div id=\"dp-open\"></div>\n<!-- DAILY-PLAYLIST:END -->\n</html>\n";
+  assert.equal(checkAdditive({ baseBytes: Buffer.from(page), currentBytes: Buffer.from(page), numstat: "" }).markerBlocks, 1);
+  assert.throws(() => checkAdditive({
+    baseBytes: Buffer.from(page), currentBytes: Buffer.from(page.replace("<html>", "<html lang=\"en\">")), numstat: "",
+  }), /index_html_base_mismatch/);
+});
+
 async function makeSite(t) {
   const root = await mkdtemp(join(tmpdir(), "libvetv-site-check-"));
   t.after(() => rm(root, { recursive: true, force: true }));
