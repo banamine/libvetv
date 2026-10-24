@@ -8,8 +8,14 @@
 - The generator reads one AJN channel M3U endpoint for each enabled channel and, when configured, makes one HTML listing request for each affiliate-listing source. It never downloads media.
 - It validates and writes JSON/M3U manifests only when their content changes.
 - GitHub Actions publishes only allowlisted `daily/` paths when publishing is enabled.
-- GitHub Pages serves the repository-root artifact; the existing page loads daily data only after the user opens the panel.
-- The existing schedule and live-player experience remains separate and unchanged.
+- GitHub Pages serves the repository-root artifact; a same-origin readiness check validates the daily index, a channel manifest, and at least one eligible media item before the default page replaces the legacy view.
+- A ready playlist opens its panel without autoplay. If readiness fails, the legacy schedule remains visible and the Daily Playlist button reports why.
+
+## Legacy page replacement gate
+
+The marked Daily Playlist root defaults to `data-dp-replace-legacy="true"`. On page load, the gate requests only the same-origin index and candidate JSON manifests. It does not request media. Replacement requires a valid index, an `ok` or `stale` channel row with a non-empty manifest, and at least one eligible item. Empty, `error`, and `no_playlist` rows do not qualify. A failed check leaves the legacy page visible and gives the Daily Playlist button a truthful failure label.
+
+When the check succeeds, the legacy container is hidden and marked `aria-hidden`; its video is paused and its visualizer/UI refresh loop is stopped. The Daily Playlist panel opens with the validated channel selected, but playback still requires an explicit Start action. The “Show legacy 24h schedule” control restores the legacy view for the browser session; session storage is best-effort, so the page remains usable when storage is unavailable. Set the root attribute to `data-dp-replace-legacy="false"` to keep the legacy view in control.
 
 ## Channels and configuration
 

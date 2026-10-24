@@ -1,3 +1,8 @@
+.dp-replacement-root {
+    width: 100%;
+    max-width: 960px;
+}
+
 .dp-launch,
 .dp-panel {
     width: 100%;
@@ -7,7 +12,45 @@
 
 .dp-launch {
     display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px 14px;
     justify-content: flex-start;
+}
+
+.dp-link {
+    padding: 0;
+    color: #f5c842;
+    background: transparent;
+    border: 0;
+    font: inherit;
+    font-size: 0.9rem;
+    text-decoration: underline;
+    cursor: pointer;
+}
+
+.dp-link:focus-visible {
+    outline: 3px solid #f5c842;
+    outline-offset: 3px;
+}
+
+.dp-link[hidden],
+.dp-check-status[hidden] {
+    display: none;
+}
+
+.dp-check-status {
+    margin: 0;
+    color: #cbd5e1;
+    font-size: 0.875rem;
+}
+
+.dp-check-status:empty {
+    display: none;
+}
+
+.dp-legacy-replaced .app-container {
+    display: none !important;
 }
 
 .dp-panel {

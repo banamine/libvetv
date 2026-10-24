@@ -63,7 +63,12 @@ const server = createServer(async (request, response) => {
     sendText(response, 400, "Bad Request");
     return;
   }
-  const requestPath = pathname === "/" ? "/index.html" : pathname;
+  const sitePath = pathname === "/libvetv"
+    ? "/"
+    : pathname.startsWith("/libvetv/")
+    ? pathname.slice("/libvetv".length)
+    : pathname;
+  const requestPath = sitePath === "/" ? "/index.html" : sitePath;
   const candidate = resolve(ROOT, `.${requestPath}`);
   const fromRoot = relative(ROOT, candidate);
   if (fromRoot.startsWith(`..${sep}`) || fromRoot === "..") {
