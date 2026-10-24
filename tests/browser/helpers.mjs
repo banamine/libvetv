@@ -114,7 +114,14 @@ export async function installLocalNetwork(page, {
         return;
       }
       if (localPath === "/__baseline__") {
-        await route.fulfill({ status: 200, contentType: "text/html; charset=utf-8", body: BASELINE_HTML });
+        // origin/main now contains the legacy-replacement gate (data-dp-replace-legacy="true"),
+        // so the baseline page must get the same opt-out as the branch page or it would hide
+        // and pause the legacy player it is supposed to represent.
+        const baselineBody = replaceLegacy ? BASELINE_HTML : BASELINE_HTML.replace(
+          'data-dp-replace-legacy="true"',
+          'data-dp-replace-legacy="false"',
+        );
+        await route.fulfill({ status: 200, contentType: "text/html; charset=utf-8", body: baselineBody });
         return;
       }
       if (localPath.startsWith("/daily/")) {
