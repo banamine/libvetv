@@ -4,6 +4,7 @@ import { test, expect } from "@playwright/test";
 import {
   assertNoUnroutedExternal,
   BASE_URL,
+  LEGACY_URL,
   installLocalNetwork,
   openPlaylist,
   waitForOldPagePlaying,
@@ -11,7 +12,7 @@ import {
 } from "./helpers.mjs";
 
 async function gotoBranch(page) {
-  await page.goto(`${BASE_URL}/`);
+  await page.goto(LEGACY_URL);
   await expect(page.locator("#dp-open")).toBeAttached();
   await waitForOldPagePlaying(page);
 }

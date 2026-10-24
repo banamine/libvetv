@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 
 import { execFileSync } from "node:child_process";
-import { readFile, readdir } from "node:fs/promises";
+import { mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { isSafeManifestPath, resolveManifestUrl } from "../assets/manifest-path.js";
@@ -19,7 +20,39 @@ function git(args, cwd) {
     cwd,
     encoding: null,
     stdio: ["ignore", "pipe", "pipe"],
+    maxBuffer: 256 * 1024 * 1024,
   });
+}
+
+function tryGit(args, cwd) {
+  try {
+    return git(args, cwd);
+  } catch {
+    return null;
+  }
+}
+
+// Added lines of `currentPath` relative to `baseText` (null means the whole file is new).
+// A temp-file diff is used so a one-time file move is compared with its real predecessor
+// instead of showing the entire moved page as added.
+export async function addedLinesAgainst(baseText, currentPath) {
+  const current = await readFile(currentPath, "utf8");
+  if (baseText === null) return current.split(/\r?\n/).map((line) => `+${line}`).join("\n");
+  const dir = await mkdtemp(resolve(tmpdir(), "verify-site-"));
+  try {
+    const basePath = resolve(dir, "base");
+    await writeFile(basePath, baseText);
+    try {
+      return execFileSync("git", ["diff", "--no-index", "--unified=0", "--", basePath, currentPath], {
+        encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], maxBuffer: 256 * 1024 * 1024,
+      });
+    } catch (error) {
+      if (error?.status === 1 && typeof error.stdout === "string") return error.stdout; // differences found
+      throw error;
+    }
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
 }
 
 function addedLinesFromDiff(diff) {
@@ -102,7 +135,23 @@ export async function verifySite({
     } catch {
       throw new Error(`base_ref_unavailable:${baseRef}`);
     }
-    diff = git(["diff", "--unified=0", baseRef, "--", "index.html"], repoRoot).toString("utf8");
+    // legacy.html's predecessor is the base's legacy.html, or the base's index.html before the
+    // studio redesign merged. The studio index.html is new unless the base already has legacy.html.
+    const baseLegacy = tryGit(["show", `${baseRef}:legacy.html`], repoRoot);
+    const baseIndex = tryGit(["show", `${baseRef}:index.html`], repoRoot);
+    const parts = [];
+    for (const [file, baseBytes] of [
+      ["legacy.html", baseLegacy ?? baseIndex],
+      ["index.html", baseLegacy ? baseIndex : null],
+    ]) {
+      try {
+        parts.push(await addedLinesAgainst(baseBytes === null ? null : baseBytes.toString("utf8"),
+          resolve(repoRoot, file)));
+      } catch (error) {
+        if (error?.code !== "ENOENT") throw error;
+      }
+    }
+    diff = parts.join("\n");
   }
   checkAddedResourceOrigins(diff, DUMMY_BASE);
   await assertAssetsDoNotImportScripts(repoRoot);

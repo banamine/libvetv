@@ -4,6 +4,7 @@ import { test, expect } from "@playwright/test";
 import {
   assertNoUnroutedExternal,
   BASE_URL,
+  LEGACY_URL,
   installLocalNetwork,
   readIndexFixture,
 } from "./helpers.mjs";
@@ -27,7 +28,7 @@ function oneRowIndex(row) {
   return { schemaVersion: 1, channels: [row] };
 }
 
-async function gotoReplacementPage(page, path = "/") {
+async function gotoReplacementPage(page, path = "/legacy.html") {
   await page.goto(`${BASE_URL}${path}`);
   await expect(page.locator("#dp-root")).toBeAttached();
   await expect(page.locator("#dp-root")).toHaveAttribute("data-dp-replace-legacy", "true");
@@ -189,7 +190,7 @@ test("error and no_playlist rows with last-good manifest paths do not qualify fo
 
 test("index and manifest paths remain under a /libvetv/ base path", async ({ page }) => {
   const stats = await installLocalNetwork(page, { replaceLegacy: true });
-  await gotoReplacementPage(page, "/libvetv/");
+  await gotoReplacementPage(page, "/libvetv/legacy.html");
   await expect(page.locator("#dp-panel")).toBeVisible();
   await expect(page.locator(".app-container")).toBeHidden();
   expect(stats.dailyPaths).toContain("/libvetv/daily/latest/index.json");
@@ -199,7 +200,7 @@ test("index and manifest paths remain under a /libvetv/ base path", async ({ pag
 
 test("data-dp-replace-legacy=false keeps legacy visible even when playlist can be opened", async ({ page }) => {
   const stats = await installLocalNetwork(page);
-  await page.goto(BASE_URL);
+  await page.goto(LEGACY_URL);
   await expect(page.locator("#dp-root")).toHaveAttribute("data-dp-replace-legacy", "false");
   await expectLegacyVisible(page);
   expect(stats.dailyPaths).toEqual([]);

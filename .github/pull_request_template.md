@@ -4,7 +4,7 @@
 ## Validation (paste real output or links)
 - [ ] `npm run test:unit` totals:
 - [ ] `npm run test:browser` totals (if applicable):
-- [ ] `npm run check:additive` output (if `index.html` is touched):
+- [ ] `npm run check:additive` output (if `legacy.html` is touched):
 - [ ] `ci.yml` run URL:
 
 ## Checklist
