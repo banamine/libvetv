@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "channelId": "classic-cinema",
+  "publishedAt": "2026-10-24T10:00:00.000Z",
+  "durationBasis": "unknown",
+  "declaredTotalSeconds": null,
+  "items": [
+    {
+      "seq": 1,
+      "localId": "demo-classic-1",
+      "title": "DEMO — Synthetic Red Clip",
+      "url": "https://archive.org/download/synthetic/red.mp4",
+      "durationSec": -1
+    },
+    {
+      "seq": 2,
+      "localId": "demo-classic-2",
+      "title": "DEMO — Encoded Space Error Clip",
+      "url": "https://archive.org/download/some-id/My%20Movie.mp4",
+      "durationSec": -1
+    },
+    {
+      "seq": 3,
+      "localId": "demo-classic-3",
+      "title": "DEMO — Synthetic Green Clip",
+      "url": "https://archive.org/download/synthetic/green.mp4",
+      "durationSec": -1
+    }
+  ]
+}

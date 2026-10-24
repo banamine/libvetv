@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 1,
+  "channelId": "rapid-switch",
+  "publishedAt": "2026-10-24T10:00:00.000Z",
+  "durationBasis": "unknown",
+  "declaredTotalSeconds": null,
+  "items": [
+    {
+      "seq": 1,
+      "localId": "demo-rapid-1",
+      "title": "DEMO — Rapid Clip One",
+      "url": "https://archive.org/download/synthetic/red.mp4",
+      "durationSec": -1
+    },
+    {
+      "seq": 2,
+      "localId": "demo-rapid-2",
+      "title": "DEMO — Rapid Encoded Clip",
+      "url": "https://archive.org/download/some-id/My%20Movie.mp4",
+      "durationSec": -1
+    },
+    {
+      "seq": 3,
+      "localId": "demo-rapid-3",
+      "title": "DEMO — Rapid Clip Three",
+      "url": "https://archive.org/download/synthetic/blue.mp4",
+      "durationSec": -1
+    },
+    {
+      "seq": 4,
+      "localId": "demo-rapid-4",
+      "title": "DEMO — Rapid Clip Four",
+      "url": "https://archive.org/download/synthetic/green.mp4",
+      "durationSec": -1
+    }
+  ]
+}
