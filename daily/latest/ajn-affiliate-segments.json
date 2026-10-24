@@ -1,0 +1,362 @@
+{
+  "asOf": "2026-10-23T23:04:00.000Z",
+  "channelId": "ajn-affiliate-segments",
+  "contentHash": "c33542d9ed6d922372e50f6eac7d9fdd4a27d3c554955824e353f11de18dea0c",
+  "declaredTotalSeconds": null,
+  "durationBasis": "unknown",
+  "excluded": [
+    {
+      "count": 2,
+      "reason": "fixture_missing"
+    }
+  ],
+  "guideId": "ajn-affiliate-segments",
+  "idNote": "localId is libvetv-local, not an AJN canonical id",
+  "itemCount": 3,
+  "items": [
+    {
+      "asOf": "2026-10-23T20:04:00.000Z",
+      "date": "2026-10-23",
+      "day": "Fri",
+      "durationSec": null,
+      "kind": "show",
+      "localId": "lv-2d894817edc2",
+      "loop": true,
+      "name": "The Alex Jones Show",
+      "network": "ajn",
+      "segments": [
+        {
+          "durationSec": null,
+          "localId": "lv-2d894817edc2",
+          "modifiedAt": "2026-10-23T16:08:00.000Z",
+          "name": "Fri-Alex-Hr1-Seg1.mp4",
+          "seq": 1,
+          "sizeBytes": 385199345,
+          "title": "The Alex Jones Show — Hour 1, segment 1",
+          "url": "https://affiliates.alexjoneslive.com/mp4-segs/Fri-Alex-Hr1-Seg1.mp4"
+        },
+        {
+          "durationSec": null,
+          "localId": "lv-08dfe78bda5a",
+          "modifiedAt": "2026-10-23T16:37:00.000Z",
+          "name": "Fri-Alex-Hr1-Seg2.mp4",
+          "seq": 2,
+          "sizeBytes": 1768606641,
+          "title": "The Alex Jones Show — Hour 1, segment 2",
+          "url": "https://affiliates.alexjoneslive.com/mp4-segs/Fri-Alex-Hr1-Seg2.mp4"
+        },
+        {
+          "durationSec": null,
+          "localId": "lv-2b0b8086a6ac",
+          "modifiedAt": "2026-10-23T17:04:00.000Z",
+          "name": "Fri-Alex-Hr1-Seg3.mp4",
+          "seq": 3,
+          "sizeBytes": 1964141725,
+          "title": "The Alex Jones Show — Hour 1, segment 3",
+          "url": "https://affiliates.alexjoneslive.com/mp4-segs/Fri-Alex-Hr1-Seg3.mp4"
+        },
+        {
+          "durationSec": null,
+          "localId": "lv-68ad141b87d1",
+          "modifiedAt": "2026-10-23T17:08:00.000Z",
+          "name": "Fri-Alex-Hr2-Seg1.mp4",
+          "seq": 4,
+          "sizeBytes": 346766577,
+          "title": "The Alex Jones Show — Hour 2, segment 1",
+          "url": "https://affiliates.alexjoneslive.com/mp4-segs/Fri-Alex-Hr2-Seg1.mp4"
+        },
+        {
+          "durationSec": null,
+          "localId": "lv-87887334c45e",
+          "modifiedAt": "2026-10-23T17:37:00.000Z",
+          "name": "Fri-Alex-Hr2-Seg2.mp4",
+          "seq": 5,
+          "sizeBytes": 1793239985,
+          "title": "The Alex Jones Show — Hour 2, segment 2",
+          "url": "https://affiliates.alexjoneslive.com/mp4-segs/Fri-Alex-Hr2-Seg2.mp4"
+        },
+        {
+          "durationSec": null,
+          "localId": "lv-156875957e75",
+          "modifiedAt": "2026-10-23T18:04:00.000Z",
+          "name": "Fri-Alex-Hr2-Seg3.mp4",
+          "seq": 6,
+          "sizeBytes": 1780194461,
+          "title": "The Alex Jones Show — Hour 2, segment 3",
+          "url": "https://affiliates.alexjoneslive.com/mp4-segs/Fri-Alex-Hr2-Seg3.mp4"
+        },
+        {
+          "durationSec": null,
+          "localId": "lv-e235c4f4ab92",
+          "modifiedAt": "2026-10-23T18:08:00.000Z",
+          "name": "Fri-Alex-Hr3-Seg1.mp4",
+          "seq": 7,
+          "sizeBytes": 366611697,
+          "title": "The Alex Jones Show — Hour 3, segment 1",
+          "url": "https://affiliates.alexjoneslive.com/mp4-segs/Fri-Alex-Hr3-Seg1.mp4"
+        },
+        {
+          "durationSec": null,
+          "localId": "lv-b5bb7acc0c8c",
+          "modifiedAt": "2026-10-23T18:37:00.000Z",
+          "name": "Fri-Alex-Hr3-Seg2.mp4",
+          "seq": 8,
+          "sizeBytes": 1658903473,
+          "title": "The Alex Jones Show — Hour 3, segment 2",
+          "url": "https://affiliates.alexjoneslive.com/mp4-segs/Fri-Alex-Hr3-Seg2.mp4"
+        },
+        {
+          "durationSec": null,
+          "localId": "lv-f6900c0abffb",
+          "modifiedAt": "2026-10-23T19:04:00.000Z",
+          "name": "Fri-Alex-Hr3-Seg3.mp4",
+          "seq": 9,
+          "sizeBytes": 1839336605,
+          "title": "The Alex Jones Show — Hour 3, segment 3",
+          "url": "https://affiliates.alexjoneslive.com/mp4-segs/Fri-Alex-Hr3-Seg3.mp4"
+        },
+        {
+          "durationSec": null,
+          "localId": "lv-9221594add8c",
+          "modifiedAt": "2026-10-23T19:08:00.000Z",
+          "name": "Fri-Alex-Hr4-Seg1.mp4",
+          "seq": 10,
+          "sizeBytes": 395189489,
+          "title": "The Alex Jones Show — Hour 4, segment 1",
+          "url": "https://affiliates.alexjoneslive.com/mp4-segs/Fri-Alex-Hr4-Seg1.mp4"
+        },
+        {
+          "durationSec": null,
+          "localId": "lv-4412adf0b7d2",
+          "modifiedAt": "2026-10-23T19:37:00.000Z",
+          "name": "Fri-Alex-Hr4-Seg2.mp4",
+          "seq": 11,
+          "sizeBytes": 1816562517,
+          "title": "The Alex Jones Show — Hour 4, segment 2",
+          "url": "https://affiliates.alexjoneslive.com/mp4-segs/Fri-Alex-Hr4-Seg2.mp4"
+        },
+        {
+          "durationSec": null,
+          "localId": "lv-0fef496abccc",
+          "modifiedAt": "2026-10-23T20:04:00.000Z",
+          "name": "Fri-Alex-Hr4-Seg3.mp4",
+          "seq": 12,
+          "sizeBytes": 1869188245,
+          "title": "The Alex Jones Show — Hour 4, segment 3",
+          "url": "https://affiliates.alexjoneslive.com/mp4-segs/Fri-Alex-Hr4-Seg3.mp4"
+        }
+      ],
+      "seq": 1,
+      "showId": "Alex",
+      "title": "The Alex Jones Show",
+      "url": "https://affiliates.alexjoneslive.com/mp4-segs/Fri-Alex-Hr1-Seg1.mp4"
+    },
+    {
+      "asOf": "2026-10-23T23:04:00.000Z",
+      "date": "2026-10-23",
+      "day": "Fri",
+      "durationSec": null,
+      "kind": "show",
+      "localId": "lv-815928118d08",
+      "loop": true,
+      "name": "War Room with Harrison Smith",
+      "network": "ajn",
+      "segments": [
+        {
+          "durationSec": null,
+          "localId": "lv-815928118d08",
+          "modifiedAt": "2026-10-23T20:08:00.000Z",
+          "name": "Fri-WarRoom-Hr1-Seg1.mp4",
+          "seq": 1,
+          "sizeBytes": 397888745,
+          "title": "War Room with Harrison Smith — Hour 1, segment 1",
+          "url": "https://affiliates.alexjoneslive.com/mp4-segs/Fri-WarRoom-Hr1-Seg1.mp4"
+        },
+        {
+          "durationSec": null,
+          "localId": "lv-c22c84208e70",
+          "modifiedAt": "2026-10-23T20:37:00.000Z",
+          "name": "Fri-WarRoom-Hr1-Seg2.mp4",
+          "seq": 2,
+          "sizeBytes": 1757191089,
+          "title": "War Room with Harrison Smith — Hour 1, segment 2",
+          "url": "https://affiliates.alexjoneslive.com/mp4-segs/Fri-WarRoom-Hr1-Seg2.mp4"
+        },
+        {
+          "durationSec": null,
+          "localId": "lv-37c892c8f743",
+          "modifiedAt": "2026-10-23T21:04:00.000Z",
+          "name": "Fri-WarRoom-Hr1-Seg3.mp4",
+          "seq": 3,
+          "sizeBytes": 1869221021,
+          "title": "War Room with Harrison Smith — Hour 1, segment 3",
+          "url": "https://affiliates.alexjoneslive.com/mp4-segs/Fri-WarRoom-Hr1-Seg3.mp4"
+        },
+        {
+          "durationSec": null,
+          "localId": "lv-4a542f863179",
+          "modifiedAt": "2026-10-23T21:08:00.000Z",
+          "name": "Fri-WarRoom-Hr2-Seg1.mp4",
+          "seq": 4,
+          "sizeBytes": 358513905,
+          "title": "War Room with Harrison Smith — Hour 2, segment 1",
+          "url": "https://affiliates.alexjoneslive.com/mp4-segs/Fri-WarRoom-Hr2-Seg1.mp4"
+        },
+        {
+          "durationSec": null,
+          "localId": "lv-aa291edca9a6",
+          "modifiedAt": "2026-10-23T21:37:00.000Z",
+          "name": "Fri-WarRoom-Hr2-Seg2.mp4",
+          "seq": 5,
+          "sizeBytes": 1689787313,
+          "title": "War Room with Harrison Smith — Hour 2, segment 2",
+          "url": "https://affiliates.alexjoneslive.com/mp4-segs/Fri-WarRoom-Hr2-Seg2.mp4"
+        },
+        {
+          "durationSec": null,
+          "localId": "lv-d896542c8cda",
+          "modifiedAt": "2026-10-23T22:04:00.000Z",
+          "name": "Fri-WarRoom-Hr2-Seg3.mp4",
+          "seq": 6,
+          "sizeBytes": 1834073245,
+          "title": "War Room with Harrison Smith — Hour 2, segment 3",
+          "url": "https://affiliates.alexjoneslive.com/mp4-segs/Fri-WarRoom-Hr2-Seg3.mp4"
+        },
+        {
+          "durationSec": null,
+          "localId": "lv-0d071bcb6259",
+          "modifiedAt": "2026-10-23T22:08:00.000Z",
+          "name": "Fri-WarRoom-Hr3-Seg1.mp4",
+          "seq": 7,
+          "sizeBytes": 363183345,
+          "title": "War Room with Harrison Smith — Hour 3, segment 1",
+          "url": "https://affiliates.alexjoneslive.com/mp4-segs/Fri-WarRoom-Hr3-Seg1.mp4"
+        },
+        {
+          "durationSec": null,
+          "localId": "lv-c6233ded84ac",
+          "modifiedAt": "2026-10-23T22:37:00.000Z",
+          "name": "Fri-WarRoom-Hr3-Seg2.mp4",
+          "seq": 8,
+          "sizeBytes": 1664109397,
+          "title": "War Room with Harrison Smith — Hour 3, segment 2",
+          "url": "https://affiliates.alexjoneslive.com/mp4-segs/Fri-WarRoom-Hr3-Seg2.mp4"
+        },
+        {
+          "durationSec": null,
+          "localId": "lv-a4655bbc4833",
+          "modifiedAt": "2026-10-23T23:04:00.000Z",
+          "name": "Fri-WarRoom-Hr3-Seg3.mp4",
+          "seq": 9,
+          "sizeBytes": 1671064733,
+          "title": "War Room with Harrison Smith — Hour 3, segment 3",
+          "url": "https://affiliates.alexjoneslive.com/mp4-segs/Fri-WarRoom-Hr3-Seg3.mp4"
+        }
+      ],
+      "seq": 2,
+      "showId": "WarRoom",
+      "title": "War Room with Harrison Smith",
+      "url": "https://affiliates.alexjoneslive.com/mp4-segs/Fri-WarRoom-Hr1-Seg1.mp4"
+    },
+    {
+      "asOf": "2026-10-19T01:04:00.000Z",
+      "date": "2026-10-18",
+      "day": "Sun",
+      "durationSec": null,
+      "kind": "show",
+      "localId": "lv-ff096765d653",
+      "loop": true,
+      "name": "Sunday Night Live",
+      "network": "ajn",
+      "segments": [
+        {
+          "durationSec": null,
+          "localId": "lv-ff096765d653",
+          "modifiedAt": "2026-10-18T23:08:00.000Z",
+          "name": "Sun-SundayLive-Hr1-Seg1.mp4",
+          "seq": 1,
+          "sizeBytes": 393719017,
+          "title": "Sunday Night Live — Hour 1, segment 1",
+          "url": "https://affiliates.alexjoneslive.com/mp4-segs/Sun-SundayLive-Hr1-Seg1.mp4"
+        },
+        {
+          "durationSec": null,
+          "localId": "lv-bc6688a130b7",
+          "modifiedAt": "2026-10-18T23:36:00.000Z",
+          "name": "Sun-SundayLive-Hr1-Seg2.mp4",
+          "seq": 2,
+          "sizeBytes": 1282735025,
+          "title": "Sunday Night Live — Hour 1, segment 2",
+          "url": "https://affiliates.alexjoneslive.com/mp4-segs/Sun-SundayLive-Hr1-Seg2.mp4"
+        },
+        {
+          "durationSec": null,
+          "localId": "lv-5f651ae5b0c6",
+          "modifiedAt": "2026-10-19T00:04:00.000Z",
+          "name": "Sun-SundayLive-Hr1-Seg3.mp4",
+          "seq": 3,
+          "sizeBytes": 1604144277,
+          "title": "Sunday Night Live — Hour 1, segment 3",
+          "url": "https://affiliates.alexjoneslive.com/mp4-segs/Sun-SundayLive-Hr1-Seg3.mp4"
+        },
+        {
+          "durationSec": null,
+          "localId": "lv-8e2a3aeb07f3",
+          "modifiedAt": "2026-10-19T00:08:00.000Z",
+          "name": "Sun-SundayLive-Hr2-Seg1.mp4",
+          "seq": 4,
+          "sizeBytes": 348470513,
+          "title": "Sunday Night Live — Hour 2, segment 1",
+          "url": "https://affiliates.alexjoneslive.com/mp4-segs/Sun-SundayLive-Hr2-Seg1.mp4"
+        },
+        {
+          "durationSec": null,
+          "localId": "lv-aaf9efd3268a",
+          "modifiedAt": "2026-10-19T00:37:00.000Z",
+          "name": "Sun-SundayLive-Hr2-Seg2.mp4",
+          "seq": 5,
+          "sizeBytes": 1572158385,
+          "title": "Sunday Night Live — Hour 2, segment 2",
+          "url": "https://affiliates.alexjoneslive.com/mp4-segs/Sun-SundayLive-Hr2-Seg2.mp4"
+        },
+        {
+          "durationSec": null,
+          "localId": "lv-555f48f4c3df",
+          "modifiedAt": "2026-10-19T01:04:00.000Z",
+          "name": "Sun-SundayLive-Hr2-Seg3.mp4",
+          "seq": 6,
+          "sizeBytes": 1682803961,
+          "title": "Sunday Night Live — Hour 2, segment 3",
+          "url": "https://affiliates.alexjoneslive.com/mp4-segs/Sun-SundayLive-Hr2-Seg3.mp4"
+        }
+      ],
+      "seq": 3,
+      "showId": "SundayLive",
+      "title": "Sunday Night Live",
+      "url": "https://affiliates.alexjoneslive.com/mp4-segs/Sun-SundayLive-Hr1-Seg1.mp4"
+    }
+  ],
+  "label": "AJN Affiliate Shows",
+  "loop": true,
+  "mediaAllowlist": [
+    {
+      "host": "archive.org",
+      "prefix": "/download/"
+    },
+    {
+      "host": "affiliates.alexjoneslive.com",
+      "prefix": "/mp4-segs/"
+    }
+  ],
+  "network": "ajn",
+  "playbackMode": "sequential",
+  "publishedAt": "2026-10-24T16:00:30.069Z",
+  "repeatCount": 0,
+  "schemaVersion": 1,
+  "serviceDayUtc": "2026-10-24",
+  "sourceGeneratedAt": "2026-10-24T16:00:30.069Z",
+  "sourceType": "affiliate-listing",
+  "targetSeconds": 86400,
+  "toleranceSeconds": 900,
+  "uniqueItemCount": 3
+}
