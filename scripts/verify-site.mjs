@@ -6,6 +6,7 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { eligibility } from "./lib/eligibility.mjs";
 import { isSafeManifestPath, resolveManifestUrl } from "../assets/manifest-path.js";
+import { checkLockfile } from "./check-lockfile.mjs";
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const DUMMY_BASE = "https://example.invalid/libvetv/";
@@ -103,6 +104,7 @@ export async function verifySite({
   resourceDiff,
 } = {}) {
   const repoRoot = resolve(root);
+  await checkLockfile(resolve(repoRoot, "package-lock.json"));
   let diff = resourceDiff;
   if (diff === undefined) {
     if (!baseRef || baseRef.startsWith("-")) throw new Error("base_ref_invalid");

@@ -14,6 +14,10 @@ async function makeSite(t) {
   const root = await mkdtemp(join(tmpdir(), "libvetv-site-check-"));
   t.after(() => rm(root, { recursive: true, force: true }));
   await writeFile(join(root, "index.html"), "<!doctype html>\n");
+  await writeFile(join(root, "package-lock.json"), JSON.stringify({
+    lockfileVersion: 3,
+    packages: { "": {} },
+  }));
   return root;
 }
 
@@ -63,6 +67,23 @@ test("verify-site accepts a repository with no daily index", async (t) => {
     checkedManifests: 0,
     message: "No daily/latest/index.json; valid (nothing has been published).",
   });
+});
+
+test("verify-site rejects lockfiles that resolve packages through a non-public registry", async (t) => {
+  const root = await makeSite(t);
+  await writeFile(join(root, "package-lock.json"), JSON.stringify({
+    lockfileVersion: 3,
+    packages: {
+      "": {},
+      "node_modules/example": {
+        resolved: "http://package-firewall.replit.internal/npm/example/-/example-1.0.0.tgz",
+      },
+    },
+  }));
+  await assert.rejects(
+    verifySite({ root, resourceDiff: "" }),
+    /lockfile_resolved_url_invalid/,
+  );
 });
 
 test("verify-site validates a public index and its referenced manifest", async (t) => {

@@ -55,7 +55,6 @@ function collectConsoleErrors(page) {
 async function captureExistingPage(page) {
   const video = await waitForOldPagePlaying(page);
   await expect(page.locator("#guide-strip .guide-card").first()).toBeVisible();
-  await page.waitForTimeout(80);
   const beforeClick = await page.evaluate(() => {
     const videoElement = document.getElementById("video-player");
     const ids = [...document.querySelectorAll("[id]")].map((element) => element.id);
@@ -79,7 +78,6 @@ async function captureExistingPage(page) {
   await page.locator('#guide-strip .guide-card[data-id="1"]').click();
   await expect.poll(() => video.evaluate((element) => element.src)).toContain("archive.org/download/");
   const afterCardClickSrc = await video.evaluate((element) => element.src);
-  await page.waitForTimeout(80);
   return { ...beforeClick, afterCardClickSrc };
 }
 
@@ -129,6 +127,12 @@ test("playlist starts, advances on ended, completes without looping, and replays
   await gotoBranch(page);
   await selectClassic(page);
   const video = page.locator("#dp-video");
+  await video.evaluate((element) => {
+    element.__playEventCount = 0;
+    element.addEventListener("play", () => {
+      element.__playEventCount += 1;
+    });
+  });
 
   await page.getByRole("button", { name: "Start", exact: true }).click();
   await waitForVideoPlaying(video);
@@ -137,9 +141,12 @@ test("playlist starts, advances on ended, completes without looping, and replays
   await expect(page.locator(".dp-items button").nth(2)).toHaveAttribute("aria-pressed", "true", { timeout: 6_000 });
   await expect(page.getByText("Playlist complete.", { exact: true })).toBeVisible({ timeout: 6_000 });
   const completedSrc = await video.evaluate((element) => element.currentSrc);
+  await expect.poll(() => video.evaluate((element) => element.__playEventCount)).toBe(3);
+  // Keep a full synthetic clip-duration observation window to prove completion does not restart playback.
   await page.waitForTimeout(1_200);
   await expect(page.getByText("Playlist complete.", { exact: true })).toBeVisible();
   expect(await video.evaluate((element) => element.currentSrc)).toBe(completedSrc);
+  expect(await video.evaluate((element) => element.__playEventCount)).toBe(3);
 
   await page.getByRole("button", { name: "Replay", exact: true }).click();
   await waitForVideoPlaying(video);
