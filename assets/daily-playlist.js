@@ -327,8 +327,7 @@ function initializeDailyPlaylist() {
         !request ||
         machine.index !== request.requestedIndex ||
         machine.state !== "playing" ||
-        request.requestId !== playRequestId ||
-        (player.currentSrc && player.currentSrc !== request.url)
+        request.requestId !== playRequestId
       ) return;
       machine = transition(machine, "error", itemCount);
       showItemError();
