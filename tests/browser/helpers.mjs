@@ -73,6 +73,7 @@ export async function installLocalNetwork(page, {
   mediaResolver = mediaForPath,
   indexOverride = null,
   indexStatus = 200,
+  replaceLegacy = false,
   manifestOverrides = {},
   digestStatus = 200,
   digestBody = { stories: [] },
@@ -91,7 +92,20 @@ export async function installLocalNetwork(page, {
     const requestUrl = new URL(route.request().url());
     if (requestUrl.origin === BASE_URL) {
       stats.localPaths.push(requestUrl.pathname);
-      if (requestUrl.pathname === "/Daily-News-Digest-/data/current/data.json") {
+      const localPath = requestUrl.pathname.replace(/^\/libvetv(?=\/|$)/, "") || "/";
+      if (localPath === "/" || localPath === "/index.html") {
+        const response = await route.fetch();
+        let body = await response.text();
+        if (!replaceLegacy) {
+          body = body.replace(
+            'data-dp-replace-legacy="true"',
+            'data-dp-replace-legacy="false"',
+          );
+        }
+        await route.fulfill({ response, body });
+        return;
+      }
+      if (localPath === "/Daily-News-Digest-/data/current/data.json") {
         stats.digestPaths.push(requestUrl.pathname);
         await route.fulfill({
           status: digestStatus, contentType: "application/json",
@@ -99,16 +113,16 @@ export async function installLocalNetwork(page, {
         });
         return;
       }
-      if (requestUrl.pathname === "/__baseline__") {
+      if (localPath === "/__baseline__") {
         await route.fulfill({ status: 200, contentType: "text/html; charset=utf-8", body: BASELINE_HTML });
         return;
       }
-      if (requestUrl.pathname.startsWith("/daily/")) {
+      if (localPath.startsWith("/daily/")) {
         stats.dailyPaths.push(requestUrl.pathname);
         let body;
         try {
-          const fixturePath = resolve(DAILY_ROOT, `.${requestUrl.pathname.slice("/daily".length)}`);
-          if (requestUrl.pathname === "/daily/latest/index.json" && indexOverride) {
+          const fixturePath = resolve(DAILY_ROOT, `.${localPath.slice("/daily".length)}`);
+          if (localPath === "/daily/latest/index.json" && indexOverride) {
             stats.indexRequests += 1;
             const responseStatus = typeof indexStatus === "function" ? await indexStatus() : indexStatus;
             if (responseStatus !== 200) {
@@ -120,9 +134,9 @@ export async function installLocalNetwork(page, {
             }
             const index = typeof indexOverride === "function" ? await indexOverride() : indexOverride;
             body = Buffer.from(JSON.stringify(index));
-          } else if (manifestOverrides[requestUrl.pathname]) {
-            const manifest = typeof manifestOverrides[requestUrl.pathname] === "function"
-              ? await manifestOverrides[requestUrl.pathname]() : manifestOverrides[requestUrl.pathname];
+          } else if (manifestOverrides[localPath]) {
+            const manifest = typeof manifestOverrides[localPath] === "function"
+              ? await manifestOverrides[localPath]() : manifestOverrides[localPath];
             body = Buffer.from(JSON.stringify(manifest));
           } else {
             body = await readFile(fixturePath);

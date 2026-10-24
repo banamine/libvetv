@@ -370,8 +370,11 @@
             </div>
         </div>
         <!-- DAILY-PLAYLIST:BEGIN -->
+        <div id="dp-root" class="dp-replacement-root" data-dp-replace-legacy="true">
         <div class="dp-launch">
             <button id="dp-open" class="dp-button" type="button" aria-expanded="false" aria-controls="dp-panel">Daily Playlist</button>
+            <button id="dp-show-legacy" class="dp-link" type="button" hidden>Show legacy 24h schedule</button>
+            <p id="dp-check-status" class="dp-check-status" role="status" aria-live="polite">Checking daily playlist…</p>
         </div>
         <section id="dp-panel" class="dp-panel" hidden aria-labelledby="dp-title">
             <div class="dp-header">
@@ -382,6 +385,7 @@
             <div id="dp-content"></div>
             <p class="dp-footer">Items are Internet Archive files listed by AJN. This page does not verify availability or usage rights.</p>
         </section>
+        </div>
         <!-- DAILY-PLAYLIST:END -->
     </div>
 

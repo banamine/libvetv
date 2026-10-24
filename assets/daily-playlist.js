@@ -4,7 +4,7 @@ import { initialState, transition } from "./sequencer.js";
 import { validManifest } from "./manifest.js";
 import { createOverlay } from "./overlay.js";
 
-const DAILY_INDEX_URL = "./daily/latest/index.json";
+const DAILY_INDEX_URL = "daily/latest/index.json";
 
 export function setTextContent(element, value) {
   element.textContent = typeof value === "string" ? value : "";
@@ -34,6 +34,24 @@ function validIndex(value) {
   );
 }
 
+export function isReplacementCandidate(row, manifest) {
+  if (
+    !row ||
+    !["ok", "stale"].includes(row.status) ||
+    typeof row.manifest !== "string" ||
+    !Number.isSafeInteger(row.itemCount) ||
+    row.itemCount <= 0 ||
+    !validManifest(manifest, row.id) ||
+    manifest.items.length === 0
+  ) {
+    return false;
+  }
+  return manifest.items.some((item) => eligibility({
+    url: item.url,
+    durationSec: item.durationSec === null ? -1 : item.durationSec,
+  }, manifest.mediaAllowlist).ok);
+}
+
 function formatDuration(seconds) {
   const hours = Math.floor(seconds / 3600);
   const minutes = Math.floor((seconds % 3600) / 60);
@@ -47,18 +65,173 @@ function formatPublishedAt(value) {
 }
 
 function initializeDailyPlaylist() {
+  const root = document.getElementById("dp-root");
   const openButton = document.getElementById("dp-open");
   const closeButton = document.getElementById("dp-close");
+  const showLegacyButton = document.getElementById("dp-show-legacy");
+  const checkStatus = document.getElementById("dp-check-status");
   const panel = document.getElementById("dp-panel");
   const status = document.getElementById("dp-status");
   const content = document.getElementById("dp-content");
   const footer = panel?.querySelector(".dp-footer");
   const existingVideo = document.getElementById("video-player");
-  if (!openButton || !closeButton || !panel || !status || !content || !existingVideo) return;
+  const legacyContainer = document.querySelector(".app-container");
+  if (!root || !openButton || !closeButton || !showLegacyButton || !checkStatus ||
+      !panel || !status || !content || !existingVideo || !legacyContainer) return;
 
   let wasExistingVideoPlaying = false;
   let openRequest = null;
   let disposeManifest = () => {};
+  let replacementData = null;
+  let originalLegacyUpdater = null;
+  let userInteractedWithPanel = false;
+
+  function indexUrl() {
+    const url = new URL(DAILY_INDEX_URL, document.baseURI);
+    if (url.origin !== location.origin) throw new Error("index_origin");
+    return url;
+  }
+
+  function setAvailabilityFailure(message) {
+    setTextContent(checkStatus, message);
+    checkStatus.hidden = false;
+    setTextContent(openButton, message);
+    openButton.setAttribute("aria-label", message);
+    openButton.title = message;
+  }
+
+  function setAvailabilityReady(message = "") {
+    setTextContent(checkStatus, message);
+    checkStatus.hidden = !message;
+    setTextContent(openButton, "Daily Playlist");
+    openButton.setAttribute("aria-label", "Daily Playlist");
+    openButton.removeAttribute("title");
+  }
+
+  function sessionLegacyPreference() {
+    try {
+      return window.sessionStorage.getItem("dp-show-legacy") === "true";
+    } catch {
+      return false;
+    }
+  }
+
+  function hideLegacyExperience() {
+    document.documentElement.classList.add("dp-legacy-replaced");
+    legacyContainer.setAttribute("aria-hidden", "true");
+    existingVideo.pause();
+    if (typeof window.disableAudioVisualizer === "function") {
+      window.disableAudioVisualizer();
+    }
+    if (!originalLegacyUpdater && typeof window.updateNowPlayingUI === "function") {
+      originalLegacyUpdater = window.updateNowPlayingUI;
+      window.updateNowPlayingUI = () => {};
+    }
+    showLegacyButton.hidden = false;
+  }
+
+  function restoreLegacyExperience() {
+    document.documentElement.classList.remove("dp-legacy-replaced");
+    legacyContainer.removeAttribute("aria-hidden");
+    showLegacyButton.hidden = true;
+    try {
+      window.sessionStorage.setItem("dp-show-legacy", "true");
+    } catch {
+      // The current page still restores when session storage is unavailable.
+    }
+    if (originalLegacyUpdater) {
+      window.updateNowPlayingUI = originalLegacyUpdater;
+      originalLegacyUpdater = null;
+      window.updateNowPlayingUI();
+    }
+    setTextContent(checkStatus, "Legacy 24h schedule shown for this session.");
+    checkStatus.hidden = false;
+  }
+
+  async function checkReplacementAvailability() {
+    if (root.dataset.dpReplaceLegacy !== "true") {
+      checkStatus.hidden = true;
+      return;
+    }
+
+    checkStatus.hidden = false;
+    setTextContent(checkStatus, "Checking daily playlist…");
+    let index;
+    let failure = "No published playlist";
+    let response;
+    try {
+      response = await fetch(indexUrl().href, { cache: "no-store" });
+    } catch (error) {
+      setAvailabilityFailure(error?.message === "index_origin"
+        ? "Playlist unavailable: unsafe index URL"
+        : "Playlist unavailable: network error");
+      return;
+    }
+    if (response.status === 404) {
+      setAvailabilityFailure("No published playlist");
+      return;
+    }
+    if (!response.ok) {
+      setAvailabilityFailure(`Playlist unavailable: HTTP ${response.status}`);
+      return;
+    }
+    try {
+      index = await response.json();
+    } catch {
+      setAvailabilityFailure("Playlist unavailable: invalid index");
+      return;
+    }
+    if (!validIndex(index)) {
+      setAvailabilityFailure("Playlist unavailable: invalid index");
+      return;
+    }
+
+    let foundUsableRow = false;
+    for (const row of index.channels) {
+      if (!["ok", "stale"].includes(row.status) || !row.manifest || row.itemCount === 0) continue;
+      foundUsableRow = true;
+      if (!isSafeManifestPath(row.manifest, row.id)) {
+        failure = "Playlist unavailable: invalid manifest path";
+        continue;
+      }
+      try {
+        const manifestUrl = resolveManifestUrl(row.manifest, row.id, document.baseURI);
+        if (new URL(manifestUrl).origin !== location.origin) {
+          failure = "Playlist unavailable: unsafe manifest URL";
+          continue;
+        }
+        const response = await fetch(manifestUrl, { cache: "no-store" });
+        if (!response.ok) {
+          failure = "Playlist unavailable: manifest fetch failed";
+          continue;
+        }
+        const manifest = await response.json();
+        if (!isReplacementCandidate(row, manifest)) {
+          failure = "Playlist unavailable: no eligible items";
+          continue;
+        }
+        replacementData = { index, row, manifest };
+        setAvailabilityReady();
+        if (sessionLegacyPreference()) {
+          setAvailabilityReady("Daily Playlist ready; legacy schedule is shown.");
+          return;
+        }
+        hideLegacyExperience();
+        if (!userInteractedWithPanel) {
+          void openPanel({
+            preloaded: replacementData,
+            focusClose: false,
+            rememberPrevious: false,
+          });
+        }
+        return;
+      } catch {
+        failure = "Playlist unavailable: invalid manifest";
+      }
+    }
+
+    setAvailabilityFailure(foundUsableRow ? failure : "No published playlist");
+  }
 
   existingVideo.addEventListener("play", () => {
     if (panel.hidden) return;
@@ -135,7 +308,7 @@ function initializeDailyPlaylist() {
     return "Playlist data unavailable.";
   }
 
-  async function loadSelectedRow(row, mount) {
+  async function loadSelectedRow(row, mount, preloadedManifest = null) {
     disposeManifest();
     disposeManifest = () => {};
     openRequest?.abort();
@@ -148,6 +321,11 @@ function initializeDailyPlaylist() {
     }
     if (!isSafeManifestPath(row.manifest, row.id)) {
       addStateMessage(mount, "Manifest path rejected.");
+      return;
+    }
+
+    if (preloadedManifest && isReplacementCandidate(row, preloadedManifest)) {
+      renderManifest(row, preloadedManifest, mount);
       return;
     }
 
@@ -316,9 +494,7 @@ function initializeDailyPlaylist() {
       const controller = new AbortController();
       refreshRequest = controller;
       try {
-        const indexUrl = new URL(DAILY_INDEX_URL, document.baseURI);
-        if (indexUrl.origin !== location.origin) throw new Error("index_origin");
-        const indexResponse = await fetch(indexUrl.href, {
+        const indexResponse = await fetch(indexUrl().href, {
           signal: controller.signal, cache: "no-cache",
         });
         if (!indexResponse.ok) throw new Error("index_http");
@@ -553,25 +729,66 @@ function initializeDailyPlaylist() {
     });
   }
 
-  async function openPanel() {
+  function populateIndex(index, preloaded = null) {
+    const label = createElement("label", "dp-field-label", "Choose a channel");
+    label.htmlFor = "dp-channel-picker";
+    const picker = createElement("select", "dp-select");
+    picker.id = "dp-channel-picker";
+    const prompt = createElement("option", "", "Select a channel");
+    prompt.value = "";
+    picker.appendChild(prompt);
+    index.channels.forEach((row, rowIndex) => {
+      const option = createElement("option");
+      option.value = String(rowIndex);
+      setTextContent(option, `${row.label} — ${row.status}`);
+      picker.appendChild(option);
+    });
+    const mount = createElement("div", "dp-result");
+    picker.addEventListener("change", () => {
+      const row = picker.value === "" ? null : index.channels[Number(picker.value)];
+      if (row) loadSelectedRow(row, mount);
+      else {
+        disposeManifest();
+        disposeManifest = () => {};
+        openRequest?.abort();
+        mount.replaceChildren();
+      }
+    });
+    content.append(label, picker, mount);
+    if (preloaded) {
+      const rowIndex = index.channels.findIndex((row) => row.id === preloaded.row.id);
+      if (rowIndex >= 0) {
+        picker.value = String(rowIndex);
+        loadSelectedRow(preloaded.row, mount, preloaded.manifest);
+      }
+    }
+  }
+
+  async function openPanel({
+    preloaded = null,
+    focusClose = true,
+    rememberPrevious = true,
+  } = {}) {
     panel.hidden = false;
     openButton.setAttribute("aria-expanded", "true");
-    closeButton.focus();
-    wasExistingVideoPlaying = !existingVideo.paused && !existingVideo.ended;
+    if (focusClose) closeButton.focus();
+    wasExistingVideoPlaying = rememberPrevious && !existingVideo.paused && !existingVideo.ended;
     existingVideo.pause();
     disposeManifest();
     disposeManifest = () => {};
     content.replaceChildren();
     resetFooter();
+    if (preloaded) {
+      setAvailabilityReady();
+      populateIndex(preloaded.index, preloaded);
+      setStatus("");
+      return;
+    }
     setStatus("Loading Daily Playlist…");
     const controller = new AbortController();
     openRequest = controller;
     try {
-      const indexUrl = new URL(DAILY_INDEX_URL, document.baseURI);
-      if (indexUrl.origin !== new URL(document.baseURI).origin) {
-        throw new Error("index_unavailable");
-      }
-      const response = await fetch(indexUrl.href, {
+      const response = await fetch(indexUrl().href, {
         signal: controller.signal,
         cache: "no-store",
       });
@@ -580,32 +797,8 @@ function initializeDailyPlaylist() {
       if (!validIndex(index)) throw new Error("index_invalid");
       if (panel.hidden || openRequest !== controller) return;
       setStatus("");
-
-      const label = createElement("label", "dp-field-label", "Choose a channel");
-      label.htmlFor = "dp-channel-picker";
-      const picker = createElement("select", "dp-select");
-      picker.id = "dp-channel-picker";
-      const prompt = createElement("option", "", "Select a channel");
-      prompt.value = "";
-      picker.appendChild(prompt);
-      index.channels.forEach((row, rowIndex) => {
-        const option = createElement("option");
-        option.value = String(rowIndex);
-        setTextContent(option, `${row.label} — ${row.status}`);
-        picker.appendChild(option);
-      });
-      const mount = createElement("div", "dp-result");
-      picker.addEventListener("change", () => {
-        const row = picker.value === "" ? null : index.channels[Number(picker.value)];
-        if (row) loadSelectedRow(row, mount);
-        else {
-          disposeManifest();
-          disposeManifest = () => {};
-          openRequest?.abort();
-          mount.replaceChildren();
-        }
-      });
-      content.append(label, picker, mount);
+      setAvailabilityReady();
+      populateIndex(index);
     } catch (error) {
       if (error?.name === "AbortError" || panel.hidden || openRequest !== controller) return;
       content.replaceChildren();
@@ -614,10 +807,13 @@ function initializeDailyPlaylist() {
   }
 
   openButton.addEventListener("click", () => {
+    userInteractedWithPanel = true;
     if (panel.hidden) void openPanel();
     else closePanel();
   });
   closeButton.addEventListener("click", closePanel);
+  showLegacyButton.addEventListener("click", restoreLegacyExperience);
+  void checkReplacementAvailability();
 }
 
 if (typeof document !== "undefined") initializeDailyPlaylist();
