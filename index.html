@@ -316,6 +316,9 @@
             .top-bar { height: 50px; }
         }
     </style>
+    <!-- DAILY-PLAYLIST:BEGIN -->
+    <link rel="stylesheet" href="assets/daily-playlist.css" />
+    <!-- DAILY-PLAYLIST:END -->
 </head>
 <body>
     <!-- WEEBLY‑SAFE WRAPPER -->
@@ -366,6 +369,20 @@
                 <div id="guide-strip" class="horizontal-scroll"></div>
             </div>
         </div>
+        <!-- DAILY-PLAYLIST:BEGIN -->
+        <div class="dp-launch">
+            <button id="dp-open" class="dp-button" type="button" aria-expanded="false" aria-controls="dp-panel">Daily Playlist</button>
+        </div>
+        <section id="dp-panel" class="dp-panel" hidden aria-labelledby="dp-title">
+            <div class="dp-header">
+                <h2 id="dp-title">Daily Playlist</h2>
+                <button id="dp-close" class="dp-button" type="button">Close</button>
+            </div>
+            <div id="dp-status" class="dp-status" role="status" aria-live="polite"></div>
+            <div id="dp-content"></div>
+            <p class="dp-footer">Items are Internet Archive files listed by AJN. This page does not verify availability or usage rights.</p>
+        </section>
+        <!-- DAILY-PLAYLIST:END -->
     </div>
 
     <script>
@@ -12332,5 +12349,8 @@
         }
         updateNowPlayingUI();
     </script>
+    <!-- DAILY-PLAYLIST:BEGIN -->
+    <script type="module" src="assets/daily-playlist.js" defer></script>
+    <!-- DAILY-PLAYLIST:END -->
 </body>
 </html>
