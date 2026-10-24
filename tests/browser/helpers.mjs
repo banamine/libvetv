@@ -4,6 +4,8 @@ import { resolve } from "node:path";
 import { expect } from "@playwright/test";
 
 export const BASE_URL = "http://127.0.0.1:4173";
+// The studio page owns "/"; the preserved 24h schedule page lives at /legacy.html.
+export const LEGACY_URL = `${BASE_URL}/legacy.html`;
 const ROOT = process.cwd();
 const MEDIA_ROOT = resolve(ROOT, "tests/fixtures/media");
 const DAILY_ROOT = resolve(ROOT, "tests/fixtures/site/daily");
@@ -15,11 +17,22 @@ const MEDIA = {
   long: await readFile(resolve(MEDIA_ROOT, "long.mp4")),
 };
 
-export const BASELINE_HTML = execFileSync(
-  "git",
-  ["show", "origin/main:index.html"],
-  { cwd: ROOT, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] },
-);
+function showBaseline() {
+  // Before the studio redesign merges, origin/main keeps the legacy page at index.html;
+  // afterwards it lives at legacy.html. Prefer legacy.html and fall back.
+  for (const file of ["legacy.html", "index.html"]) {
+    try {
+      return execFileSync("git", ["show", `origin/main:${file}`], {
+        cwd: ROOT, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"],
+      });
+    } catch {
+      // try the next candidate
+    }
+  }
+  throw new Error("baseline_html_unavailable");
+}
+
+export const BASELINE_HTML = showBaseline();
 
 export async function readIndexFixture() {
   return JSON.parse(await readFile(resolve(DAILY_ROOT, "latest/index.json"), "utf8"));
@@ -93,13 +106,14 @@ export async function installLocalNetwork(page, {
     if (requestUrl.origin === BASE_URL) {
       stats.localPaths.push(requestUrl.pathname);
       const localPath = requestUrl.pathname.replace(/^\/libvetv(?=\/|$)/, "") || "/";
-      if (localPath === "/" || localPath === "/index.html") {
+      if (localPath === "/legacy.html") {
+        // legacy.html ships with replacement off; tests of the replacement gate opt in here.
         const response = await route.fetch();
         let body = await response.text();
-        if (!replaceLegacy) {
+        if (replaceLegacy) {
           body = body.replace(
-            'data-dp-replace-legacy="true"',
             'data-dp-replace-legacy="false"',
+            'data-dp-replace-legacy="true"',
           );
         }
         await route.fulfill({ response, body });

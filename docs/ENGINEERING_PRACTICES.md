@@ -5,7 +5,7 @@ Status: adopted 2026-10-24. This is the standing rule set for the Daily Playlist
 ## Rules that govern this repo
 
 1. **Evidence first.** A claim of "works" needs real output: test results, CI run URLs, command output. "Builds cleanly" is not evidence.
-2. **Additive changes to the existing page.** The LIVE / 24h Schedule experience is preserved. Changes to `index.html` happen only inside `DAILY-PLAYLIST:BEGIN/END` marker blocks, and `npm run check:additive` proves nothing else changed.
+2. **Additive changes to the existing page.** The LIVE / 24h Schedule experience is preserved at `legacy.html` (the Studio page is `index.html`). Changes to `legacy.html` happen only inside `DAILY-PLAYLIST:BEGIN/END` marker blocks, and `npm run check:additive` proves nothing else changed. The one-time move from `index.html` to `legacy.html` is checked by the same stripped-content hash.
 3. **Step-gated work.** Each step is one reviewable unit: commit, push, post a report as a PR comment, stop for confirmation before the next step. Reports live in PR comments, never in tracked files.
 4. **No secrets, ever.** Configuration lives in repository variables (`AJN_EXPORT_BASE_URL`, `PUBLISH_ENABLED`) and `config/channels.json`. Nothing credential-like is committed or logged. Failure logs carry reason codes and counts, not raw URLs or titles.
 5. **Least privilege.** Every workflow job declares its own minimal `permissions`. Third-party actions are pinned to full commit SHAs with the version in a comment. Existing `static.yml` is left unchanged unless a diff proves it must change.

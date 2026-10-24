@@ -1,7 +1,7 @@
 import { mkdir } from "node:fs/promises";
 import { dirname } from "node:path";
 import { test, expect } from "@playwright/test";
-import { BASE_URL, installLocalNetwork, openPlaylist, waitForOldPagePlaying, waitForVideoPlaying,
+import { LEGACY_URL, installLocalNetwork, openPlaylist, waitForOldPagePlaying, waitForVideoPlaying,
   assertNoUnroutedExternal } from "./helpers.mjs";
 
 const NOW = new Date("2026-10-24T12:00:00Z");
@@ -57,7 +57,7 @@ async function setup(page, options = {}) {
       "/daily/latest/demo-show.json": options.manifestOverrides?.["/daily/latest/demo-show.json"] || manifest,
     },
   });
-  await page.goto(BASE_URL);
+  await page.goto(LEGACY_URL);
   await waitForOldPagePlaying(page);
   expect(stats.digestPaths).toEqual([]);
   await openPlaylist(page, `DEMO — Show Channel — ${options.status || "ok"}`);
@@ -387,7 +387,7 @@ for (const width of [360, 1280]) {
       ] },
       manifestOverrides: { "/daily/latest/demo-show.json": manifest },
     });
-    await page.goto(BASE_URL);
+    await page.goto(LEGACY_URL);
     await waitForOldPagePlaying(page);
     await shot(page, info, `step8-${width}-closed.png`, "page");
 

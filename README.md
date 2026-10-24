@@ -2,6 +2,8 @@
 
 ## Architecture
 
+- `index.html` is the LIBVETV Studio page (navy/gold): the Daily Playlist stage in the centre, a Rundown dock on the left, and Media, Monitor and Telemetry docks on the right. Focus mode (button or the `F` key) hides the docks; on narrow screens the docks become bottom sheets above a tab bar. All Monitor and Telemetry numbers are read from the real `<video>` element and the browser's own resource timings; an unmeasurable value shows an em dash. Studio files: `assets/studio.css`, `assets/studio.js`; the playlist logic is unchanged in `assets/daily-playlist.js` (studio mode is `data-dp-mode="studio"` on `#dp-root`).
+- The previous LIVE / 24h Schedule page is preserved untouched at `legacy.html` and linked from the Studio header ("Classic 24h schedule"). **Rollback:** revert the studio PR (one squash commit) and `index.html` is the legacy page again.
 - This adds an on-demand, sequential playlist mode to the existing LIVE / 24h Schedule page.
 - Playback is direct archived MP4 only: existing AJN-export entries are from Archive.org, and the optional affiliate-listing source is from its explicitly allowlisted affiliate host. It is not a live stream.
 - The feature uses no embeds and accepts no audio-only entries.
@@ -13,7 +15,7 @@
 
 ## Legacy page replacement gate
 
-The marked Daily Playlist root defaults to `data-dp-replace-legacy="true"`. On page load, the gate requests only the same-origin index and candidate JSON manifests. It does not request media. Replacement requires a valid index, an `ok` or `stale` channel row with a non-empty manifest, and at least one eligible item. Empty, `error`, and `no_playlist` rows do not qualify. A failed check leaves the legacy page visible and gives the Daily Playlist button a truthful failure label.
+This section describes `legacy.html`. The Studio page does not hide anything: it opens the validated playlist without autoplay and keeps the Classic link in the header. In `legacy.html` the marked root ships with `data-dp-replace-legacy="false"` (replacement off); earlier the page shipped with replacement on. The gate itself is still covered by tests that opt in. The text below describes the gate when the attribute is `"true"`; it previously defaulted to `data-dp-replace-legacy="true"`. On page load, the gate requests only the same-origin index and candidate JSON manifests. It does not request media. Replacement requires a valid index, an `ok` or `stale` channel row with a non-empty manifest, and at least one eligible item. Empty, `error`, and `no_playlist` rows do not qualify. A failed check leaves the legacy page visible and gives the Daily Playlist button a truthful failure label.
 
 When the check succeeds, the legacy container is hidden and marked `aria-hidden`; its video is paused and its visualizer/UI refresh loop is stopped. The Daily Playlist panel opens with the validated channel selected, but playback still requires an explicit Start action. The “Show legacy 24h schedule” control restores the legacy view for the browser session; session storage is best-effort, so the page remains usable when storage is unavailable. Set the root attribute to `data-dp-replace-legacy="false"` to keep the legacy view in control.
 

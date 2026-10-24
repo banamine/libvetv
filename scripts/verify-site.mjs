@@ -102,7 +102,7 @@ export async function verifySite({
     } catch {
       throw new Error(`base_ref_unavailable:${baseRef}`);
     }
-    diff = git(["diff", "--unified=0", baseRef, "--", "index.html"], repoRoot).toString("utf8");
+    diff = git(["diff", "--unified=0", baseRef, "--", "index.html", "legacy.html"], repoRoot).toString("utf8");
   }
   checkAddedResourceOrigins(diff, DUMMY_BASE);
   await assertAssetsDoNotImportScripts(repoRoot);

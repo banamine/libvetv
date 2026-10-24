@@ -60,15 +60,26 @@ async function main() {
   } catch {
     throw new Error(`base_ref_unavailable:${baseRef}`);
   }
-  const numstat = git(["diff", "--numstat", baseRef, "--", "index.html"]).toString("utf8");
-  const baseBytes = git(["show", `${baseRef}:index.html`]);
-  const currentBytes = await readFile(resolve(REPO_ROOT, "index.html"));
+  // The preserved 24h schedule page is legacy.html. Before the studio redesign merged it was
+  // index.html on the base ref; the one-time move is checked by the stripped-content hash alone.
+  let baseFile = "legacy.html";
+  let baseBytes;
+  try {
+    baseBytes = git(["show", `${baseRef}:legacy.html`]);
+  } catch {
+    baseFile = "index.html";
+    baseBytes = git(["show", `${baseRef}:index.html`]);
+  }
+  const numstat = baseFile === "legacy.html"
+    ? git(["diff", "--numstat", baseRef, "--", "legacy.html"]).toString("utf8")
+    : "";
+  const currentBytes = await readFile(resolve(REPO_ROOT, "legacy.html"));
   const result = checkAdditive({ baseBytes, currentBytes, numstat });
   const displayedNumstat = numstat.trim()
     ? numstat.trim().split("\t").join(" | ")
-    : "(no change)";
-  console.log(`git diff --numstat ${baseRef} -- index.html: ${displayedNumstat}`);
-  console.log(`PASS: zero deleted lines; stripped ${result.markerBlocks} marker blocks match ${baseRef}:index.html SHA-256 ${result.baseHash}`);
+    : baseFile === "index.html" ? "(one-time move from index.html; content outside marker blocks compared by hash)" : "(no change)";
+  console.log(`git diff --numstat ${baseRef} -- legacy.html (base file ${baseFile}): ${displayedNumstat}`);
+  console.log(`PASS: ${baseFile === "legacy.html" ? "zero deleted lines" : "no changes outside marker blocks"}; stripped ${result.markerBlocks} marker blocks match ${baseRef}:${baseFile} SHA-256 ${result.baseHash}`);
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

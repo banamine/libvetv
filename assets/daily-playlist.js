@@ -74,8 +74,11 @@ function initializeDailyPlaylist() {
   const status = document.getElementById("dp-status");
   const content = document.getElementById("dp-content");
   const footer = panel?.querySelector(".dp-footer");
-  const existingVideo = document.getElementById("video-player");
-  const legacyContainer = document.querySelector(".app-container");
+  // Studio mode (the redesigned index page) has no legacy player to hide or pause.
+  // Detached stand-ins keep the shared code path identical without touching real nodes.
+  const studio = root?.dataset.dpMode === "studio";
+  const existingVideo = studio ? document.createElement("video") : document.getElementById("video-player");
+  const legacyContainer = studio ? document.createElement("div") : document.querySelector(".app-container");
   if (!root || !openButton || !closeButton || !showLegacyButton || !checkStatus ||
       !panel || !status || !content || !existingVideo || !legacyContainer) return;
 
@@ -149,7 +152,7 @@ function initializeDailyPlaylist() {
   }
 
   async function checkReplacementAvailability() {
-    if (root.dataset.dpReplaceLegacy !== "true") {
+    if (!studio && root.dataset.dpReplaceLegacy !== "true") {
       checkStatus.hidden = true;
       return;
     }
@@ -212,6 +215,13 @@ function initializeDailyPlaylist() {
         }
         replacementData = { index, row, manifest };
         setAvailabilityReady();
+        if (studio) {
+          // The studio page is the playlist: open it without autoplay and without hiding anything.
+          if (!userInteractedWithPanel) {
+            void openPanel({ preloaded: replacementData, focusClose: false, rememberPrevious: false });
+          }
+          return;
+        }
         if (sessionLegacyPreference()) {
           setAvailabilityReady("Daily Playlist ready; legacy schedule is shown.");
           return;
@@ -271,7 +281,7 @@ function initializeDailyPlaylist() {
   }
 
   document.addEventListener("keydown", (event) => {
-    if (event.key === "Escape" && !panel.hidden) {
+    if (event.key === "Escape" && !panel.hidden && !studio) {
       event.preventDefault();
       closePanel();
     }
