@@ -1,0 +1,48 @@
+name: Daily Playlist CI
+
+on:
+  pull_request:
+  push:
+    branches: ['build/**', 'fix/**', 'chore/**']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22'
+      - name: Assert Node 22
+        run: |
+          node -e "process.exit(process.versions.node.split('.')[0] === '22' ? 0 : 1)"
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:unit
+      - run: npm run test:browser
+      - run: npm run verify:site
+      - run: npm run check:additive
+      - name: Upload browser failure evidence
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: playwright-failure-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 7
+          if-no-files-found: warn

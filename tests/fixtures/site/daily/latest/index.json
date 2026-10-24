@@ -1,0 +1,65 @@
+{
+  "schemaVersion": 1,
+  "channels": [
+    {
+      "id": "classic-cinema",
+      "label": "DEMO — Classic Cinema",
+      "guideId": "classic-cinema",
+      "status": "ok",
+      "reason": null,
+      "manifest": "latest/classic-cinema.json",
+      "itemCount": 3,
+      "declaredTotalSeconds": null,
+      "durationBasis": "unknown",
+      "publishedAt": "2026-10-24T10:00:00.000Z"
+    },
+    {
+      "id": "rapid-switch",
+      "label": "DEMO — Rapid Switch",
+      "guideId": "rapid-switch",
+      "status": "ok",
+      "reason": null,
+      "manifest": "latest/rapid-switch.json",
+      "itemCount": 4,
+      "declaredTotalSeconds": null,
+      "durationBasis": "unknown",
+      "publishedAt": "2026-10-24T10:00:00.000Z"
+    },
+    {
+      "id": "last-good",
+      "label": "DEMO — Last Good",
+      "guideId": "last-good",
+      "status": "error",
+      "reason": "source_unavailable",
+      "manifest": "latest/last-good.json",
+      "itemCount": 1,
+      "declaredTotalSeconds": null,
+      "durationBasis": "unknown",
+      "publishedAt": "2026-10-24T09:45:00.000Z"
+    },
+    {
+      "id": "no-playlist",
+      "label": "DEMO — No Playlist",
+      "guideId": "no-playlist",
+      "status": "no_playlist",
+      "reason": "outside_tolerance",
+      "manifest": null,
+      "itemCount": 0,
+      "declaredTotalSeconds": null,
+      "durationBasis": "unknown",
+      "publishedAt": null
+    },
+    {
+      "id": "failed-no-manifest",
+      "label": "DEMO — Failed Without Last Good",
+      "guideId": "failed-no-manifest",
+      "status": "error",
+      "reason": "source_unavailable",
+      "manifest": null,
+      "itemCount": 0,
+      "declaredTotalSeconds": null,
+      "durationBasis": "unknown",
+      "publishedAt": null
+    }
+  ]
+}

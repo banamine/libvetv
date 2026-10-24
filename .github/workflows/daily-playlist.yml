@@ -1,0 +1,178 @@
+name: Daily Playlist
+
+on:
+  schedule:
+    - cron: '17 9 * * *'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: Generate an artifact without publishing
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+# Serialize the publication/deployment path with the existing Pages workflow.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    outputs:
+      gated: ${{ steps.gate.outputs.gated }}
+      changed: ${{ steps.gen.outputs.changed }}
+      exit_code: ${{ steps.gen.outputs.exit_code }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22'
+      - name: Assert Node 22
+        run: |
+          node -e "process.exit(process.versions.node.split('.')[0] === '22' ? 0 : 1)"
+      - name: Gate all AJN access
+        id: gate
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          PUBLISH_ENABLED: ${{ vars.PUBLISH_ENABLED }}
+          DRY_RUN: ${{ inputs.dry_run }}
+          AJN_EXPORT_BASE_URL: ${{ vars.AJN_EXPORT_BASE_URL }}
+        run: node scripts/ci/publication-gate.mjs
+      - name: Offline unit tests
+        if: steps.gate.outputs.gated == 'false'
+        run: npm run test:unit
+      - name: Generate (preserve partial results)
+        id: gen
+        if: steps.gate.outputs.gated == 'false'
+        env:
+          AJN_EXPORT_BASE_URL: ${{ vars.AJN_EXPORT_BASE_URL }}
+        run: bash scripts/ci/run-generate.sh
+      - name: Upload generated changes
+        if: steps.gate.outputs.gated == 'false'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: daily-playlist-changes
+          path: .tmp/out/
+          include-hidden-files: true
+          retention-days: 7
+          if-no-files-found: error
+
+  publish:
+    needs: generate
+    if: >-
+      github.ref == 'refs/heads/main' &&
+      vars.PUBLISH_ENABLED == 'true' &&
+      inputs.dry_run != true &&
+      needs.generate.outputs.gated == 'false' &&
+      needs.generate.outputs.changed == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    outputs:
+      commit_sha: ${{ steps.publish.outputs.commit_sha }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: main
+          fetch-depth: 0
+          persist-credentials: true
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22'
+      - name: Assert Node 22
+        run: |
+          node -e "process.exit(process.versions.node.split('.')[0] === '22' ? 0 : 1)"
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: daily-playlist-changes
+          path: .tmp/out
+      - name: Publish allowlisted paths only
+        id: publish
+        run: node scripts/ci/publish.mjs
+
+  deploy:
+    needs: publish
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ needs.publish.outputs.commit_sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22'
+      - name: Assert Node 22
+        run: |
+          node -e "process.exit(process.versions.node.split('.')[0] === '22' ? 0 : 1)"
+      - run: npm run verify:site
+      - name: Setup Pages
+        uses: actions/configure-pages@983d7736d9b0ae728b81ab479565c72886d7745b # v5
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@56afc609e74202658d3ffba0e8f6dda462b719fa # v3
+        with:
+          path: '.'
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5
+      - name: Smoke-check published JSON (no media requests)
+        env:
+          PAGE_URL: ${{ steps.deployment.outputs.page_url }}
+        run: node scripts/ci/smoke-pages.mjs
+
+  status:
+    needs: [generate, publish, deploy]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22'
+      - name: Assert Node 22
+        run: |
+          node -e "process.exit(process.versions.node.split('.')[0] === '22' ? 0 : 1)"
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        id: artifact
+        if: needs.generate.result == 'success' && needs.generate.outputs.gated == 'false'
+        with:
+          name: daily-playlist-changes
+          path: .tmp/out
+      - name: Evaluate all jobs, partial results and expected skips
+        if: always()
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          RUN_REF: ${{ github.ref }}
+          PUBLISH_ENABLED: ${{ vars.PUBLISH_ENABLED }}
+          DRY_RUN: ${{ inputs.dry_run }}
+          BASE_URL_PRESENT: ${{ vars.AJN_EXPORT_BASE_URL != '' }}
+          GENERATE_RESULT: ${{ needs.generate.result }}
+          GATED: ${{ needs.generate.outputs.gated }}
+          EXIT_CODE: ${{ needs.generate.outputs.exit_code }}
+          CHANGED: ${{ needs.generate.outputs.changed }}
+          ARTIFACT_RESULT: ${{ steps.artifact.outcome }}
+          PUBLISH_RESULT: ${{ needs.publish.result }}
+          DEPLOY_RESULT: ${{ needs.deploy.result }}
+        run: node scripts/ci/evaluate-status.mjs

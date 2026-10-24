@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "targetSeconds": 86400,
+  "toleranceSeconds": 900,
+  "maxSourceAgeSeconds": 86400,
+  "maxFutureSkewSeconds": 300,
+  "channels": [
+    {
+      "id": "classic-cinema",
+      "guideId": "movies-classics-vault",
+      "label": "Cinema Classics Vault",
+      "enabled": true
+    },
+    {
+      "id": "ajn-infowars-nightly-news",
+      "guideId": "cable-tv",
+      "label": "Infowars Nightly News (archive)",
+      "enabled": true
+    }
+  ]
+}

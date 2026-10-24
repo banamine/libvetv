@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "channelId": "last-good",
+  "publishedAt": "2026-10-24T09:45:00.000Z",
+  "durationBasis": "unknown",
+  "declaredTotalSeconds": null,
+  "items": [
+    {
+      "seq": 1,
+      "localId": "demo-last-good-1",
+      "title": "DEMO — Last Good Synthetic Clip",
+      "url": "https://archive.org/download/synthetic/red.mp4",
+      "durationSec": -1
+    }
+  ]
+}
