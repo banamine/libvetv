@@ -257,3 +257,20 @@
         flex-wrap: wrap;
     }
 }
+
+/* Theater layout: the selected show's player is the main feature at the top of the panel;
+   the show list sits directly under it; channel picker and publish info move below. */
+.dp-panel:not([hidden]) { display: flex; flex-direction: column; }
+.dp-panel #dp-content, .dp-panel .dp-result { display: contents; }
+.dp-panel > *, .dp-panel .dp-result > *, .dp-panel #dp-content > * { order: 20; }
+.dp-panel .dp-header { order: 0; margin-bottom: 8px; }
+.dp-panel .dp-status, .dp-panel .dp-refresh-banner, .dp-panel .dp-refresh-status,
+.dp-panel .dp-state-message { order: 1; }
+.dp-panel .dp-stage { order: 2; margin: 0 0 10px; }
+.dp-panel .dp-position { order: 3; margin: 0 0 8px; }
+.dp-panel .dp-controls { order: 4; justify-content: flex-start; }
+.dp-panel .dp-items { order: 5; }
+.dp-panel .dp-feedback { order: 6; }
+.dp-panel .dp-field-label, .dp-panel .dp-select { order: 30; }
+.dp-panel .dp-footer { order: 40; }
+@media (max-width: 640px) { .dp-panel .dp-stage .dp-video { min-height: 180px; } }
