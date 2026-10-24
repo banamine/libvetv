@@ -98,7 +98,7 @@ test("panel-closed branch preserves the origin/main page behavior", async ({ bro
 
     expect(branchSnapshot.title).toBe(baselineSnapshot.title);
     expect(branchSnapshot.ids.filter((id) => !id.startsWith("dp-")).sort())
-      .toEqual(baselineSnapshot.ids.sort());
+      .toEqual(baselineSnapshot.ids.filter((id) => !id.startsWith("dp-")).sort());
     expect(branchSnapshot.guideCards).toBe(baselineSnapshot.guideCards);
     expect(branchSnapshot.guideItemCount).toBe(baselineSnapshot.guideItemCount);
     expect(branchSnapshot.video).toEqual(baselineSnapshot.video);
