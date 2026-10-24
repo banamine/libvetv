@@ -4,6 +4,8 @@ import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { parseM3u, M3uParseError } from "./parseM3u.mjs";
 
+export const MAX_SOURCE_BYTES = 2_000_000;
+
 export class SourceConfigError extends Error {
   constructor(code) {
     super(code);
@@ -144,6 +146,9 @@ export function validateSourceResponse({ status, headers, body }, limits, now) {
   if (ageSeconds > limits.maxSourceAgeSeconds) return { ok: false, reason: "stale_source" };
   if (ageSeconds < -limits.maxFutureSkewSeconds) return { ok: false, reason: "future_source" };
   if (typeof body !== "string") return { ok: false, reason: "invalid_body" };
+  if (Buffer.byteLength(body, "utf8") > MAX_SOURCE_BYTES) {
+    return { ok: false, reason: "source_too_large" };
+  }
 
   try {
     return { ok: true, generatedAt, items: parseM3u(body) };
@@ -192,19 +197,60 @@ async function fetchRemote(channel, baseOrigin) {
       signal: AbortSignal.timeout(20_000),
       headers: { accept: "audio/x-mpegurl" },
     });
+    const contentLength = response.headers.get("content-length");
+    if (/^\d+$/.test(contentLength || "") && Number(contentLength) > MAX_SOURCE_BYTES) {
+      await response.body?.cancel().catch(() => {});
+      return { error: "source_too_large" };
+    }
+    const body = await readBoundedResponseBody(response);
     return {
       status: response.status,
       headers: {
         "content-type": response.headers.get("content-type") || "",
         "x-ajn-generated-at": response.headers.get("x-ajn-generated-at") || "",
       },
-      body: await response.text(),
+      body,
     };
   } catch (error) {
+    if (error instanceof SourceConfigError) {
+      return { error: error.code };
+    }
     if (error?.name === "TimeoutError" || error?.name === "AbortError") {
       return { error: "source_timeout" };
     }
     return { error: "source_fetch_failed" };
+  }
+}
+
+export async function readBoundedResponseBody(response) {
+  if (!response.body) return "";
+  const reader = response.body.getReader();
+  const chunks = [];
+  let totalBytes = 0;
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      totalBytes += value.byteLength;
+      if (totalBytes > MAX_SOURCE_BYTES) {
+        await reader.cancel();
+        throw new SourceConfigError("source_too_large");
+      }
+      chunks.push(value);
+    }
+  } finally {
+    reader.releaseLock();
+  }
+  const bytes = new Uint8Array(totalBytes);
+  let offset = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  try {
+    return new TextDecoder("utf-8", { fatal: true }).decode(bytes);
+  } catch {
+    throw new SourceConfigError("source_invalid_utf8");
   }
 }
 

@@ -78,6 +78,15 @@ function safeOutputPath(root, ...segments) {
   return path;
 }
 
+async function readTextMaybe(path) {
+  try {
+    return await readFile(path, "utf8");
+  } catch (error) {
+    if (error?.code === "ENOENT") return null;
+    throw error;
+  }
+}
+
 async function loadLastGood(path) {
   const value = await readJsonMaybe(path);
   if (!value || value.schemaVersion !== 1 || !Array.isArray(value.items)) return null;
@@ -274,18 +283,17 @@ export async function runGenerator(options) {
 
   const index = createIndex(rows);
   const indexPath = safeOutputPath(outRoot, "daily", "latest", "index.json");
-  if (await writeIfChangedAtomic(indexPath, stableJson(index))) {
+  const indexText = stableJson(index);
+  const baselineIndexPath = safeOutputPath(baselineRoot, "daily", "latest", "index.json");
+  const baselineIndexText = await readTextMaybe(baselineIndexPath);
+  if (baselineIndexText !== indexText) {
+    await writeIfChangedAtomic(indexPath, indexText);
     changedFiles.push(relative(outRoot, indexPath).split(sep).join("/"));
   }
   changedFiles.sort();
 
-  if (changedFiles.length > 0) {
-    const changedFileText = `${changedFiles.join("\n")}\n`;
-    await writeIfChangedAtomic(
-      safeOutputPath(outRoot, "changed-files.txt"),
-      changedFileText,
-    );
-  }
+  const changedFileText = changedFiles.length > 0 ? `${changedFiles.join("\n")}\n` : "";
+  await writeIfChangedAtomic(safeOutputPath(outRoot, "changed-files.txt"), changedFileText);
 
   const counts = { ok: 0, no_playlist: 0, error: 0 };
   for (const row of rows) counts[row.status] += 1;

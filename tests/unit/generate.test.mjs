@@ -7,7 +7,11 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import "./network-guard.mjs";
 import { parseM3u } from "../../scripts/lib/parseM3u.mjs";
-import { validateExportBaseUrl } from "../../scripts/lib/fetchSource.mjs";
+import {
+  MAX_SOURCE_BYTES,
+  readBoundedResponseBody,
+  validateExportBaseUrl,
+} from "../../scripts/lib/fetchSource.mjs";
 import { writeFileAtomic } from "../../scripts/lib/write.mjs";
 import { parseArgs, runGenerator, validateConfig } from "../../scripts/generate.mjs";
 
@@ -95,19 +99,58 @@ test("fixture run processes both configured channels and writes index, JSON and 
   assert.ok(result.changedFiles.includes("daily/latest/classic-cinema.m3u"));
 });
 
-test("identical second run changes zero output files and leaves the tree hash unchanged", async (t) => {
+test("identical run reports no artifact changes and empties changed-files.txt", async (t) => {
   const { root, fixtureDir } = await makeTemp(t);
   const config = await readConfig();
   const options = { config, baselineDir: root, outDir: root, fixtureDir, now: NOW };
 
   const first = await offlineRun(options);
-  const firstHash = await treeHash(root);
   const second = await offlineRun(options);
+  const secondHash = await treeHash(root);
+  const third = await offlineRun(options);
 
   assert.equal(first.changed, true);
   assert.equal(second.changed, false);
   assert.deepEqual(second.changedFiles, []);
-  assert.equal(await treeHash(root), firstHash);
+  assert.equal(await readFile(join(root, "changed-files.txt"), "utf8"), "");
+  assert.equal(third.changed, false);
+  assert.deepEqual(third.changedFiles, []);
+  assert.equal(await treeHash(root), secondHash);
+});
+
+test("unchanged content in a separate output directory writes an empty change list and no daily files", async (t) => {
+  const { root, fixtureDir } = await makeTemp(t);
+  const baselineDir = join(root, "baseline");
+  const outDir = join(root, "out");
+  const config = await readConfig();
+  const first = await offlineRun({
+    config,
+    baselineDir,
+    outDir: baselineDir,
+    fixtureDir,
+    now: NOW,
+  });
+  assert.equal(first.exitCode, 0);
+
+  for (const channel of config.channels) {
+    const headerPath = join(fixtureDir, `${channel.guideId}__${channel.id}.headers.json`);
+    const headers = JSON.parse(await readFile(headerPath, "utf8"));
+    headers.headers["x-ajn-generated-at"] = "2026-10-25T09:00:00.000Z";
+    await writeFile(headerPath, `${JSON.stringify(headers, null, 2)}\n`);
+  }
+  const second = await offlineRun({
+    config,
+    baselineDir,
+    outDir,
+    fixtureDir,
+    now: new Date("2026-10-25T10:00:00.000Z"),
+  });
+
+  assert.equal(second.exitCode, 0);
+  assert.equal(second.changed, false);
+  assert.deepEqual(second.changedFiles, []);
+  assert.equal(await readFile(join(outDir, "changed-files.txt"), "utf8"), "");
+  assert.deepEqual(await readdir(outDir), ["changed-files.txt"]);
 });
 
 test("a title-only edit changes contentHash and writes the next UTC dated folder", async (t) => {
@@ -257,6 +300,50 @@ test("non-200 fixture status is rejected without publishing a manifest", async (
   assert.equal(result.exitCode, 3);
   assert.equal(result.channels[0].reason, "http_status");
   assert.deepEqual(await readdir(join(root, "daily/latest")), ["index.json"]);
+});
+
+test("source bodies over 2 MB fail with source_too_large", async (t) => {
+  const { root, fixtureDir } = await makeTemp(t);
+  const config = await readConfig();
+  config.channels = [config.channels[0]];
+  const sourcePath = join(fixtureDir, "movies-classics-vault__classic-cinema.m3u");
+  await writeFile(sourcePath, `#EXTM3U\n${"x".repeat(MAX_SOURCE_BYTES + 1)}`);
+
+  const result = await offlineRun({
+    config,
+    baselineDir: root,
+    outDir: root,
+    fixtureDir,
+    now: NOW,
+  });
+  assert.equal(result.exitCode, 3);
+  assert.equal(result.channels[0].reason, "source_too_large");
+  assert.deepEqual(await readdir(join(root, "daily/latest")), ["index.json"]);
+});
+
+test("streaming source reader cancels as soon as the 2 MB cap is exceeded", async () => {
+  let chunksSent = 0;
+  let cancelled = false;
+  const body = new ReadableStream({
+    pull(controller) {
+      if (chunksSent === 0) {
+        controller.enqueue(new Uint8Array(MAX_SOURCE_BYTES));
+        chunksSent += 1;
+      } else {
+        controller.enqueue(new Uint8Array(1));
+        chunksSent += 1;
+      }
+    },
+    cancel() {
+      cancelled = true;
+    },
+  });
+
+  await assert.rejects(
+    readBoundedResponseBody({ body }),
+    (error) => error.code === "source_too_large",
+  );
+  assert.equal(cancelled, true);
 });
 
 test("invalid tvg-id and malformed source bodies fail the whole channel", async (t) => {
