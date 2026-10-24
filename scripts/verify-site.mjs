@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import { execFileSync } from "node:child_process";
-import { readFile } from "node:fs/promises";
+import { readFile, readdir } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { eligibility } from "./lib/eligibility.mjs";
@@ -10,6 +10,7 @@ import { isSafeManifestPath, resolveManifestUrl } from "../assets/manifest-path.
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const DUMMY_BASE = "https://example.invalid/libvetv/";
 const CHANNEL_ID = /^[a-z0-9][a-z0-9-]{0,127}$/;
+const IMPORTS_SCRIPTS = /(?:\bfrom\s*|\bimport\s*(?:\(\s*)?)["'][^"']*(?:\.\.\/)+scripts(?:\/|["'])/;
 
 function git(args, cwd) {
   return execFileSync("git", args, {
@@ -42,6 +43,30 @@ export function checkAddedResourceOrigins(diffText, baseUrl = DUMMY_BASE) {
       if (resource.origin !== base.origin) throw new Error("new_resource_off_origin");
     }
   }
+  return true;
+}
+
+export async function assertAssetsDoNotImportScripts(root) {
+  const assetsRoot = resolve(root, "assets");
+  async function visit(directory) {
+    let entries;
+    try {
+      entries = await readdir(directory, { withFileTypes: true });
+    } catch (error) {
+      if (error?.code === "ENOENT") return;
+      throw error;
+    }
+    for (const entry of entries) {
+      const path = resolve(directory, entry.name);
+      if (entry.isDirectory()) {
+        await visit(path);
+      } else if (entry.isFile() && /\.(?:js|jsx|mjs|mts|cjs|cts|ts|tsx)$/i.test(entry.name)) {
+        const source = await readFile(path, "utf8");
+        if (IMPORTS_SCRIPTS.test(source)) throw new Error("assets_import_scripts");
+      }
+    }
+  }
+  await visit(assetsRoot);
   return true;
 }
 
@@ -89,6 +114,7 @@ export async function verifySite({
     diff = git(["diff", "--unified=0", baseRef, "--", "index.html"], repoRoot).toString("utf8");
   }
   checkAddedResourceOrigins(diff, DUMMY_BASE);
+  await assertAssetsDoNotImportScripts(repoRoot);
 
   const indexPath = resolve(repoRoot, "daily/latest/index.json");
   let indexText;

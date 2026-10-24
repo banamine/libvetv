@@ -121,6 +121,42 @@ test("verify-site rejects unsafe media URLs in referenced manifests", async (t) 
   );
 });
 
+test("verify-site rejects assets modules that import from scripts", async (t) => {
+  const root = await makeSite(t);
+  await mkdir(join(root, "assets"), { recursive: true });
+  await writeFile(
+    join(root, "assets/daily-playlist.js"),
+    'import { eligibility } from "../scripts/lib/eligibility.mjs";\n',
+  );
+  await assert.rejects(
+    verifySite({ root, resourceDiff: "" }),
+    /assets_import_scripts/,
+  );
+});
+
+test("browser import graph stays on .js assets with a one-line Node re-export", async () => {
+  const browserSource = await readFile(
+    new URL("../../assets/daily-playlist.js", import.meta.url),
+    "utf8",
+  );
+  const browserValidator = await readFile(
+    new URL("../../assets/eligibility.js", import.meta.url),
+    "utf8",
+  );
+  const nodeFacade = await readFile(
+    new URL("../../scripts/lib/eligibility.mjs", import.meta.url),
+    "utf8",
+  );
+  assert.match(browserSource, /from "\.\/eligibility\.js"/);
+  assert.doesNotMatch(browserSource, /from ["'][^"']*\.mjs["']/);
+  assert.doesNotMatch(browserSource, /from ["'](?:node:|\.{1,2}\/scripts\/)/);
+  assert.doesNotMatch(browserValidator, /\bimport\b/);
+  assert.equal(
+    nodeFacade.trim(),
+    'export { eligibility, normalizeTitle } from "../../assets/eligibility.js";',
+  );
+});
+
 test("verify-site accepts same-origin new resources and rejects off-origin ones", () => {
   assert.equal(
     checkAddedResourceOrigins(

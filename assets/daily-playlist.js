@@ -1,4 +1,4 @@
-import { eligibility } from "../scripts/lib/eligibility.mjs";
+import { eligibility } from "./eligibility.js";
 import { isSafeManifestPath, resolveManifestUrl } from "./manifest-path.js";
 import { initialState, transition } from "./sequencer.js";
 
@@ -74,6 +74,12 @@ function initializeDailyPlaylist() {
   let wasExistingVideoPlaying = false;
   let openRequest = null;
 
+  existingVideo.addEventListener("play", () => {
+    if (panel.hidden) return;
+    const dailyVideo = document.getElementById("dp-video");
+    if (dailyVideo && !dailyVideo.paused) dailyVideo.pause();
+  });
+
   function setStatus(message) {
     setTextContent(status, message);
   }
@@ -91,6 +97,13 @@ function initializeDailyPlaylist() {
     wasExistingVideoPlaying = false;
     openButton.focus();
   }
+
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && !panel.hidden) {
+      event.preventDefault();
+      closePanel();
+    }
+  });
 
   function addStateMessage(parent, message) {
     const paragraph = createElement("p", "dp-state-message", message);
@@ -206,6 +219,8 @@ function initializeDailyPlaylist() {
     const itemCount = manifest.items.length;
     let machine = initialState();
     let itemButtons = [];
+    let playRequestId = 0;
+    let activePlayRequest = null;
 
     function updateItemButtons() {
       itemButtons.forEach((button, index) => {
@@ -251,25 +266,35 @@ function initializeDailyPlaylist() {
     }
 
     function playCurrent() {
-      const item = manifest.items[machine.index];
+      const requestedIndex = machine.index;
+      const requestId = ++playRequestId;
+      const item = manifest.items[requestedIndex];
       const safe = eligibility({
         url: item.url,
         durationSec: item.durationSec === null ? -1 : item.durationSec,
       });
       if (!safe.ok) {
+        activePlayRequest = null;
         machine = transition(machine, "error", itemCount);
         showItemError();
         return;
       }
+      activePlayRequest = { requestedIndex, requestId, url: item.url };
       feedback.replaceChildren();
       updateItemButtons();
       player.src = item.url;
       player.load();
-      player.play().catch(() => {
-        if (machine.state === "playing") {
-          machine = transition(machine, "error", itemCount);
-          showItemError();
+      player.play().catch((error) => {
+        if (
+          error?.name === "AbortError" ||
+          machine.index !== requestedIndex ||
+          machine.state !== "playing" ||
+          requestId !== playRequestId
+        ) {
+          return;
         }
+        machine = transition(machine, "error", itemCount);
+        showItemError();
       });
     }
 
@@ -297,16 +322,28 @@ function initializeDailyPlaylist() {
       else if (machine.state === "playing") playCurrent();
     });
     player.addEventListener("error", () => {
-      if (machine.state === "playing") {
-        machine = transition(machine, "error", itemCount);
-        showItemError();
-      }
+      const request = activePlayRequest;
+      if (
+        !request ||
+        machine.index !== request.requestedIndex ||
+        machine.state !== "playing" ||
+        request.requestId !== playRequestId ||
+        (player.currentSrc && player.currentSrc !== request.url)
+      ) return;
+      machine = transition(machine, "error", itemCount);
+      showItemError();
+    });
+    player.addEventListener("play", () => {
+      if (panel.hidden) return;
+      wasExistingVideoPlaying ||= !existingVideo.paused && !existingVideo.ended;
+      existingVideo.pause();
     });
   }
 
   async function openPanel() {
     panel.hidden = false;
     openButton.setAttribute("aria-expanded", "true");
+    closeButton.focus();
     wasExistingVideoPlaying = !existingVideo.paused && !existingVideo.ended;
     existingVideo.pause();
     content.replaceChildren();
