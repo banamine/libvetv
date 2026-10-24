@@ -106,18 +106,48 @@
 }
 
 .dp-published,
-.dp-duration {
+.dp-duration,
+.dp-refresh-status {
     color: #cbd5e1;
 }
+
+.dp-refresh-status:empty { display: none; }
 
 .dp-video {
     display: block;
     width: 100%;
     max-height: 70vh;
-    margin: 14px 0;
+    margin: 0;
     background: #000;
     border-radius: 8px;
 }
+
+.dp-stage {
+    position: relative;
+    margin: 14px 0;
+    isolation: isolate;
+    background: #000;
+    border-radius: 8px;
+    overflow: hidden;
+    min-height: 230px;
+}
+
+.dp-stage .dp-video { min-height: 230px; object-fit: contain; }
+.dp-stage:fullscreen { display: flex; align-items: center; border-radius: 0; }
+.dp-stage:fullscreen .dp-video { width: 100%; height: 100%; max-height: none; object-fit: contain; }
+.dp-fullscreen { position: absolute; top: 8px; right: 8px; z-index: 3; font-size: 14px; }
+.dp-overlay { position: absolute; inset: 0; pointer-events: none; color: white; z-index: 2; }
+.dp-local-clock { position: absolute; top: 8px; left: 8px; max-width: calc(100% - 155px); background: #080c16ed; padding: 8px; border-radius: 6px; font-size: 14px; line-height: 1.4; }
+.dp-headlines, .dp-headlines-unavailable { position: absolute; left: 8px; right: 8px; bottom: 58px; margin: 0; padding: 10px 12px; background: #080c16ed; border-radius: 6px; font-size: 16px; line-height: 1.4; }
+.dp-headlines { pointer-events: auto; border-left: 3px solid #f5c842; max-height: calc(100% - 150px); overflow-y: auto; overflow-wrap: anywhere; }
+.dp-headlines:focus-visible { outline: 3px solid #f5c842; outline-offset: -3px; }
+.dp-headlines[hidden], .dp-headlines-unavailable[hidden] { display: none; }
+.dp-headline { margin: 0; }
+.dp-headline-asof { display: block; color: #cbd5e1; font-size: 14px; margin-top: 4px; }
+.dp-headline-list { margin: 0; padding-left: 20px; }
+.dp-headline-list li + li { margin-top: 10px; }
+.dp-headlines-unavailable { font-size: 14px; }
+.dp-position { line-height: 1.5; color: #f5df9b; }
 
 .dp-items {
     display: grid;
@@ -165,6 +195,7 @@
 }
 
 @media (max-width: 640px) {
+    .dp-stage, .dp-stage .dp-video { min-height: 340px; }
     .dp-launch,
     .dp-panel {
         margin-top: 12px;

@@ -4,9 +4,10 @@ import { execFileSync } from "node:child_process";
 import { readFile, readdir } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { eligibility } from "./lib/eligibility.mjs";
 import { isSafeManifestPath, resolveManifestUrl } from "../assets/manifest-path.js";
 import { checkLockfile } from "./check-lockfile.mjs";
+import { validManifest } from "../assets/manifest.js";
+import { validateAffiliateSource } from "./lib/fetchAffiliateListing.mjs";
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const DUMMY_BASE = "https://example.invalid/libvetv/";
@@ -72,30 +73,9 @@ export async function assertAssetsDoNotImportScripts(root) {
 }
 
 function validateManifest(manifest, row) {
-  if (
-    !manifest ||
-    manifest.schemaVersion !== 1 ||
-    manifest.channelId !== row.id ||
-    !Array.isArray(manifest.items) ||
-    manifest.items.length === 0
-  ) {
-    throw new Error("manifest_schema_invalid");
-  }
-  for (let index = 0; index < manifest.items.length; index += 1) {
-    const item = manifest.items[index];
-    if (
-      !item ||
-      item.seq !== index + 1 ||
-      typeof item.localId !== "string" ||
-      typeof item.title !== "string" ||
-      !eligibility({
-        url: item.url,
-        durationSec: item.durationSec === null ? -1 : item.durationSec,
-      }).ok
-    ) {
-      throw new Error("manifest_item_invalid");
-    }
-  }
+  if (!manifest || manifest.schemaVersion !== 1 || manifest.channelId !== row.id ||
+      !Array.isArray(manifest.items) || manifest.items.length === 0) throw new Error("manifest_schema_invalid");
+  if (!validManifest(manifest, row.id)) throw new Error("manifest_item_invalid");
 }
 
 export async function verifySite({
@@ -105,6 +85,15 @@ export async function verifySite({
 } = {}) {
   const repoRoot = resolve(root);
   await checkLockfile(resolve(repoRoot, "package-lock.json"));
+  let sourceConfig = null;
+  try { sourceConfig = JSON.parse(await readFile(resolve(repoRoot, "config/channels.json"), "utf8")); }
+  catch (error) { if (error?.code !== "ENOENT") throw error; }
+  if (sourceConfig?.sources !== undefined) {
+    if (!Array.isArray(sourceConfig.sources)) throw new Error("source_config_invalid");
+    for (const source of sourceConfig.sources) {
+      try { validateAffiliateSource(source); } catch { throw new Error("source_config_invalid"); }
+    }
+  }
   let diff = resourceDiff;
   if (diff === undefined) {
     if (!baseRef || baseRef.startsWith("-")) throw new Error("base_ref_invalid");
@@ -144,7 +133,7 @@ export async function verifySite({
       !row ||
       typeof row.id !== "string" ||
       !CHANNEL_ID.test(row.id) ||
-      !["ok", "no_playlist", "error"].includes(row.status)
+      !["ok", "no_playlist", "error", "stale"].includes(row.status)
     ) {
       throw new Error("index_channel_invalid");
     }

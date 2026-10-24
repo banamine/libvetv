@@ -21,7 +21,8 @@ const CONFIG_PATH = resolve(TEST_DIR, "../../config/channels.json");
 const NOW = new Date("2026-10-24T10:00:00.000Z");
 
 async function readConfig() {
-  return JSON.parse(await readFile(CONFIG_PATH, "utf8"));
+  const config = JSON.parse(await readFile(CONFIG_PATH, "utf8"));
+  return { ...config, sources: [] };
 }
 
 async function makeTemp(t) {

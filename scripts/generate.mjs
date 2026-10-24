@@ -3,10 +3,12 @@
 import { appendFile, mkdir, readFile } from "node:fs/promises";
 import { dirname, isAbsolute, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
-import { eligibility, normalizeTitle } from "./lib/eligibility.mjs";
 import { fetchChannelSource, SourceConfigError, validateExportBaseUrl } from "./lib/fetchSource.mjs";
+import { fetchAffiliateListing, validateAffiliateSource } from "./lib/fetchAffiliateListing.mjs";
+import { parseAffiliateListing, selectAffiliateShows } from "./lib/affiliateListing.mjs";
 import { createIndex, createManifest, manifestToM3u, stableJson } from "./lib/manifest.mjs";
 import { assignLocalIds } from "./lib/ids.mjs";
+import { ARCHIVE_MEDIA_ALLOWLIST, eligibility } from "../assets/eligibility.js";
 import { select } from "./lib/select.mjs";
 import { readJsonMaybe, writeIfChangedAtomic } from "./lib/write.mjs";
 
@@ -24,7 +26,8 @@ export function validateConfig(config) {
       throw new TypeError("config_invalid");
     }
   }
-  if (config.schemaVersion !== 1 || !Array.isArray(config.channels) || config.channels.length > 8) {
+  if (config.schemaVersion !== 1 || !Array.isArray(config.channels) || config.channels.length > 8 ||
+      (config.sources !== undefined && (!Array.isArray(config.sources) || config.sources.length > 8))) {
     throw new TypeError("config_invalid");
   }
   const ids = new Set();
@@ -37,11 +40,18 @@ export function validateConfig(config) {
       typeof channel.label !== "string" ||
       channel.label.trim() === "" ||
       typeof channel.enabled !== "boolean" ||
+      typeof channel.network !== "string" ||
+      !channel.network.trim() || /[\u0000-\u001f\u007f]/.test(channel.network) ||
       ids.has(channel.id)
     ) {
       throw new TypeError("config_invalid");
     }
     ids.add(channel.id);
+  }
+  for (const source of config.sources || []) {
+    try { validateAffiliateSource(source); } catch { throw new TypeError("config_invalid"); }
+    if (ids.has(source.id)) throw new TypeError("config_invalid");
+    ids.add(source.id);
   }
   if (!config.channels.some((channel) => channel.enabled)) throw new TypeError("config_invalid");
   return config;
@@ -106,6 +116,7 @@ async function appendWorkflowOutputs(result) {
       `Daily Playlist generator: channels=${result.channels.length} ok=${result.counts.ok} no_playlist=${result.counts.no_playlist} error=${result.counts.error}`,
       `Changed paths=${result.changedFiles.length}`,
       `Reason counts: ${reasons}`,
+      `Unknown show tokens: ${result.unknownShowTokens.join(", ") || "none"}`,
       "",
     ].join("\n");
     await appendFile(process.env.GITHUB_STEP_SUMMARY, summary);
@@ -136,6 +147,7 @@ export async function runGenerator(options) {
   const rows = [];
   const changedFiles = [];
   const reasonCounts = {};
+  const unknownShowTokens = new Set();
 
   for (const channel of config.channels.filter((entry) => entry.enabled)) {
     const source = await fetchChannelSource(channel, { fixtureDir, baseOrigin, limits, now });
@@ -177,20 +189,15 @@ export async function runGenerator(options) {
       continue;
     }
 
-    const excludedCounts = {};
     const eligibleItems = [];
-    for (const sourceItem of source.items) {
-      const item = {
-        title: normalizeTitle(sourceItem.title),
-        url: sourceItem.url,
-        durationSec: sourceItem.durationSec,
-      };
-      const verdict = eligibility(item);
-      if (!verdict.ok) {
-        excludedCounts[verdict.reason] = (excludedCounts[verdict.reason] || 0) + 1;
-      } else {
-        eligibleItems.push(item);
-      }
+    const excludedCounts = {};
+    for (const item of source.items) {
+      const result = eligibility({
+        url: item.url,
+        durationSec: item.durationSec === null ? -1 : item.durationSec,
+      }, channel.mediaAllowlist || ARCHIVE_MEDIA_ALLOWLIST);
+      if (result.ok) eligibleItems.push(item);
+      else excludedCounts[result.reason] = (excludedCounts[result.reason] || 0) + 1;
     }
     for (const [reason, count] of Object.entries(excludedCounts)) {
       reasonCounts[reason] = (reasonCounts[reason] || 0) + count;
@@ -281,6 +288,88 @@ export async function runGenerator(options) {
     });
   }
 
+  for (const sourceConfig of config.sources || []) {
+    const channel = {
+      id: sourceConfig.id,
+      guideId: sourceConfig.id,
+      label: sourceConfig.label || "AJN Affiliate Shows",
+      network: sourceConfig.network,
+      sourceType: sourceConfig.type,
+      loop: sourceConfig.loop,
+      mediaAllowlist: sourceConfig.mediaAllowlist,
+    };
+    const lastGood = await loadLastGood(safeOutputPath(baselineRoot, "daily", "latest", `${channel.id}.json`));
+    const fetched = await fetchAffiliateListing(sourceConfig, { fixtureDir, now });
+    let listing;
+    let chosen;
+    let failReason = null;
+    if (!fetched.ok) failReason = fetched.reason;
+    else {
+      listing = parseAffiliateListing(fetched.body, {
+        shows: sourceConfig.shows, fileBase: sourceConfig.fileBase, now,
+      });
+      for (const [reason, count] of Object.entries(listing.reasonCounts)) {
+        reasonCounts[reason] = (reasonCounts[reason] || 0) + count;
+      }
+      listing.unknownShowTokens.forEach((token) => unknownShowTokens.add(token));
+      if (listing.rows.length === 0) failReason = "listing_no_valid_rows";
+      else {
+        const selected = selectAffiliateShows(listing.rows, sourceConfig, now);
+        chosen = selected.shows;
+        for (const [reason, count] of Object.entries(selected.reasonCounts)) {
+          reasonCounts[reason] = (reasonCounts[reason] || 0) + count;
+        }
+        if (chosen.length === 0) failReason = "no_complete_day_set";
+      }
+    }
+
+    if (failReason) {
+      reasonCounts[failReason] = (reasonCounts[failReason] || 0) + 1;
+      const shownAsOf = lastGood?.asOf ?? null;
+      rows.push({
+        id: channel.id, label: channel.label, guideId: channel.guideId,
+        status: lastGood ? "stale" : "no_playlist", reason: failReason,
+        manifest: lastGood ? `latest/${channel.id}.json` : null,
+        itemCount: lastGood?.itemCount ?? 0,
+        declaredTotalSeconds: lastGood?.declaredTotalSeconds ?? null,
+        durationBasis: lastGood?.durationBasis ?? "unknown",
+        publishedAt: lastGood?.publishedAt ?? null, asOf: shownAsOf,
+      });
+      continue;
+    }
+
+    const items = assignLocalIds(chosen.map((item) => ({
+      ...item, url: item.segments[0].url,
+    })));
+    const selection = select(items, config);
+    const manifest = createManifest({
+      channel, config, serviceDayUtc: now.toISOString().slice(0, 10),
+      sourceGeneratedAt: fetched.fetchedAt || now.toISOString(),
+      publishedAt: now.toISOString(), selection, items: selection.items,
+      excluded: Object.keys(reasonCounts).sort().map((reason) => ({ reason, count: reasonCounts[reason] })),
+    });
+    const baselineManifest = lastGood;
+    const currentManifest = baselineManifest?.contentHash === manifest.contentHash ? baselineManifest : manifest;
+    if (baselineManifest?.contentHash !== manifest.contentHash) {
+      for (const [path, content] of [
+        [safeOutputPath(outRoot, "daily", now.toISOString().slice(0, 10), channel.id, "playlist.json"), stableJson(manifest)],
+        [safeOutputPath(outRoot, "daily", now.toISOString().slice(0, 10), channel.id, "playlist.m3u"), manifestToM3u(manifest)],
+        [safeOutputPath(outRoot, "daily", "latest", `${channel.id}.json`), stableJson(manifest)],
+        [safeOutputPath(outRoot, "daily", "latest", `${channel.id}.m3u`), manifestToM3u(manifest)],
+      ]) {
+        if (await writeIfChangedAtomic(path, content)) changedFiles.push(relative(outRoot, path).split(sep).join("/"));
+      }
+    }
+    const fallback = currentManifest.items.find((item) => item.kind === "show" && item.fallbackFromDay);
+    rows.push({
+      id: channel.id, label: channel.label, guideId: channel.guideId, status: "ok",
+      reason: null, manifest: `latest/${channel.id}.json`, itemCount: currentManifest.itemCount,
+      declaredTotalSeconds: currentManifest.declaredTotalSeconds,
+      durationBasis: currentManifest.durationBasis, publishedAt: currentManifest.publishedAt,
+      asOf: currentManifest.asOf, ...(fallback ? { fallbackFromDay: fallback.fallbackFromDay } : {}),
+    });
+  }
+
   const index = createIndex(rows);
   const indexPath = safeOutputPath(outRoot, "daily", "latest", "index.json");
   const indexText = stableJson(index);
@@ -296,14 +385,19 @@ export async function runGenerator(options) {
   await writeIfChangedAtomic(safeOutputPath(outRoot, "changed-files.txt"), changedFileText);
 
   const counts = { ok: 0, no_playlist: 0, error: 0 };
+  if (rows.some((row) => row.status === "stale")) counts.stale = 0;
   for (const row of rows) counts[row.status] += 1;
   const result = {
     exitCode: rows.some((row) => row.status !== "ok") ? 3 : 0,
     changed: changedFiles.length > 0,
     changedFiles,
-    channels: rows.map(({ id, status, reason, itemCount }) => ({ id, status, reason, itemCount })),
+    channels: rows.map(({ id, status, reason, itemCount, asOf, fallbackFromDay }) => ({
+      id, status, reason, itemCount, ...(asOf !== undefined ? { asOf } : {}),
+      ...(fallbackFromDay !== undefined ? { fallbackFromDay } : {}),
+    })),
     counts,
     reasonCounts,
+    unknownShowTokens: [...unknownShowTokens].sort(),
   };
   await appendWorkflowOutputs(result);
   return result;

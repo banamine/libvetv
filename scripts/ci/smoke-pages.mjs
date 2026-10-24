@@ -1,7 +1,7 @@
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { eligibility } from "../../assets/eligibility.js";
 import { resolveManifestUrl } from "../../assets/manifest-path.js";
+import { validManifest } from "../../assets/manifest.js";
 
 export async function smokePages(
   pageUrl,
@@ -31,15 +31,11 @@ export async function smokePages(
   let count = 0;
   for (const row of index.channels) {
     if (!/^[a-z0-9][a-z0-9-]{0,127}$/.test(row.id || "") ||
-        !["ok", "error", "no_playlist"].includes(row.status)) throw new Error("page_row_invalid");
+        !["ok", "error", "no_playlist", "stale"].includes(row.status)) throw new Error("page_row_invalid");
     if (row.manifest === null && row.status !== "ok") continue;
     const url = resolveManifestUrl(row.manifest, row.id, base.href);
     const manifest = await fetchJson(url);
-    if (manifest?.schemaVersion !== 1 || manifest.channelId !== row.id ||
-        !Array.isArray(manifest.items) || manifest.items.length === 0 ||
-        manifest.items.some((item, i) => item.seq !== i + 1 ||
-          typeof item.localId !== "string" || typeof item.title !== "string" ||
-          !eligibility({ url: item.url, durationSec: item.durationSec ?? -1 }).ok)) {
+    if (!validManifest(manifest, row.id)) {
       throw new Error("page_manifest_invalid");
     }
     count += 1;
