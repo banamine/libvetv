@@ -183,8 +183,44 @@ test("Pages smoke rejects unsafe manifests before fetching them", async () => {
 test("Pages smoke rejects invalid schema, HTTP failures and unsafe media URLs", async () => {
   for (const options of [{ schemaVersion: 2 }, { status: 503 }, { media: "https://evil.example/item.mp4" }]) {
     const fixture = smokeFixture(options);
-    await assert.rejects(smokePages("https://example.invalid/libvetv/", fixture.fetchImpl));
+    await assert.rejects(smokePages("https://example.invalid/libvetv/", fixture.fetchImpl, async () => {}));
   }
+});
+
+test("Pages smoke retries index and manifest 404s then passes on the third request", async () => {
+  const calls = [];
+  const delays = [];
+  const index = { schemaVersion: 1, channels: [{ id: "demo", status: "ok", manifest: "latest/demo.json" }] };
+  const manifest = { schemaVersion: 1, channelId: "demo", items: [
+    { seq: 1, localId: "synthetic", title: "DEMO", url: "https://archive.org/download/synthetic/item.mp4", durationSec: 42 },
+  ] };
+  const fetchImpl = async (url, options) => {
+    calls.push(url);
+    assert.equal(options.redirect, "error");
+    if (url.endsWith("index.json")) {
+      const attempts = calls.filter((entry) => entry.endsWith("index.json")).length;
+      return attempts < 3 ? { status: 404 } : { status: 200, json: async () => index };
+    }
+    const attempts = calls.filter((entry) => entry.endsWith("demo.json")).length;
+    return attempts < 3 ? { status: 404 } : { status: 200, json: async () => manifest };
+  };
+  assert.deepEqual(await smokePages("https://example.invalid/libvetv/", fetchImpl,
+    async (milliseconds) => { delays.push(milliseconds); }), { checkedManifests: 1 });
+  assert.equal(calls.filter((url) => url.endsWith("index.json")).length, 3);
+  assert.equal(calls.filter((url) => url.endsWith("demo.json")).length, 3);
+  assert.deepEqual(delays, [15_000, 15_000, 15_000, 15_000]);
+  assert.ok(calls.every((url) => url.endsWith(".json")), "smoke checks must not fetch media");
+});
+
+test("Pages smoke fails with pages_smoke_failed after four failed fetch attempts", async () => {
+  const calls = [];
+  const delays = [];
+  const fetchImpl = async (url) => { calls.push(url); return { status: 404 }; };
+  await assert.rejects(smokePages("https://example.invalid/libvetv/", fetchImpl,
+    async (milliseconds) => { delays.push(milliseconds); }), /pages_smoke_failed/);
+  assert.equal(calls.length, 4);
+  assert.equal(calls.every((url) => url.endsWith("index.json")), true);
+  assert.deepEqual(delays, [15_000, 15_000, 15_000]);
 });
 
 test("new workflows pin every action and keep gated generator and status wiring", async () => {
