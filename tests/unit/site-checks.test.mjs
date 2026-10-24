@@ -266,3 +266,20 @@ test("feed titles are assigned with textContent and never parsed as markup", asy
   );
   assert.doesNotMatch(source, /\.innerHTML\b/);
 });
+
+test("added-lines diff compares a moved page with its predecessor and flags only new off-origin resources", async (t) => {
+  const { addedLinesAgainst } = await import("../../scripts/verify-site.mjs");
+  const root = await mkdtemp(join(tmpdir(), "libvetv-added-"));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const base = '<script src="https://cdn.example.invalid/old.js"></script>\n<p>one</p>\n';
+  const same = join(root, "same.html");
+  await writeFile(same, base);
+  assert.equal(checkAddedResourceOrigins(await addedLinesAgainst(base, same)), true);
+  const added = join(root, "added.html");
+  await writeFile(added, `${base}<script src="https://cdn.example.invalid/new.js"></script>\n`);
+  await assert.rejects(async () => checkAddedResourceOrigins(await addedLinesAgainst(base, added)),
+    /new_resource_off_origin/);
+  const fresh = join(root, "fresh.html");
+  await writeFile(fresh, '<link rel="stylesheet" href="assets/x.css">\n');
+  assert.equal(checkAddedResourceOrigins(await addedLinesAgainst(null, fresh)), true);
+});
