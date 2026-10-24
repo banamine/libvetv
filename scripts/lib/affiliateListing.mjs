@@ -72,6 +72,43 @@ function parseModified(value, nowMs) {
   return parsed;
 }
 
+// The real listing (verified 2026-10-24) is a <pre> tree, one line per file:
+//   ├── [  385199345 Oct 23 11:08]    <a href="...">Fri-Alex-Hr1-Seg1.mp4</a>
+// Files older than ~6 months may show "Oct 23  2025" instead of a time.
+const PRE_LINE = /\[\s*(\d+)\s+([A-Za-z]{3}\s+\d{1,2}\s+(?:\d{1,2}:\d{2}|\d{4}))\s*\]\s*<a\b[^>]*>([^<]+)<\/a\s*>/g;
+
+function parsePreRows(html) {
+  const result = [];
+  for (const [, size, when, name] of html.matchAll(PRE_LINE)) {
+    const modified = /\d:\d{2}$/.test(when) ? when : `${when} 00:00`;
+    result.push({ filename: cellText(name), cells: [size, modified.replace(/\s+/g, " ")] });
+  }
+  return result;
+}
+
+function zoneOffsetMs(ms, timeZone) {
+  const parts = Object.fromEntries(new Intl.DateTimeFormat("en-US", {
+    timeZone, hourCycle: "h23", year: "numeric", month: "2-digit", day: "2-digit",
+    hour: "2-digit", minute: "2-digit", second: "2-digit",
+  }).formatToParts(ms).map((part) => [part.type, part.value]));
+  return Date.UTC(parts.year, parts.month - 1, parts.day, parts.hour, parts.minute, parts.second) -
+    Math.floor(ms / 1000) * 1000;
+}
+
+// Convert a wall-clock time (expressed as if it were UTC) in `timeZone` to a real UTC instant.
+function localToUtc(localAsUtcMs, timeZone) {
+  if (!timeZone) return localAsUtcMs;
+  let utc = localAsUtcMs - zoneOffsetMs(localAsUtcMs, timeZone);
+  utc = localAsUtcMs - zoneOffsetMs(utc, timeZone);
+  return utc;
+}
+
+export function validListingTimeZone(value) {
+  if (value === undefined) return true;
+  if (typeof value !== "string" || !/^[A-Za-z_]+(?:\/[A-Za-z_+\-0-9]+){0,2}$|^UTC$/.test(value)) return false;
+  try { new Intl.DateTimeFormat("en-US", { timeZone: value }); return true; } catch { return false; }
+}
+
 function parseRows(html) {
   const result = [];
   for (const [, row] of html.matchAll(/<tr\b[^>]*>([\s\S]*?)<\/tr\s*>/gi)) {
@@ -81,7 +118,7 @@ function parseRows(html) {
     const filename = cellText(anchor?.[1] ?? cells.find((cell) => FILENAME.test(cellText(cell))) ?? "");
     if (filename) result.push({ filename, cells: cells.map(cellText) });
   }
-  return result;
+  return result.length ? result : parsePreRows(html);
 }
 
 function completeSet(rows) {
@@ -102,7 +139,7 @@ function completeSet(rows) {
   return true;
 }
 
-export function parseAffiliateListing(html, { shows, fileBase, now = new Date() } = {}) {
+export function parseAffiliateListing(html, { shows, fileBase, now = new Date(), timeZone } = {}) {
   if (typeof html !== "string" || !shows || typeof shows !== "object") throw new TypeError("affiliate_listing_invalid");
   const base = new URL(fileBase);
   if (base.protocol !== "https:" || base.hostname !== "affiliates.alexjoneslive.com" ||
@@ -110,6 +147,7 @@ export function parseAffiliateListing(html, { shows, fileBase, now = new Date() 
       base.username || base.password) throw new TypeError("affiliate_file_base_invalid");
   const nowMs = now instanceof Date ? now.getTime() : Number(now);
   if (!Number.isFinite(nowMs)) throw new TypeError("affiliate_clock_invalid");
+  if (!validListingTimeZone(timeZone)) throw new TypeError("affiliate_timezone_invalid");
   const rows = [];
   const reasonCounts = {};
   const unknownShowTokens = new Set();
@@ -127,11 +165,14 @@ export function parseAffiliateListing(html, { shows, fileBase, now = new Date() 
     if (hour < 1 || hour > 99 || segment < 1 || segment > 99) { reject("invalid_filename"); continue; }
     const size = parsedRow.cells.map(sizeBytes).find((value) => value !== null);
     if (!size) { reject("invalid_size"); continue; }
-    const modified = parsedRow.cells.map((value) => parseModified(value, nowMs)).find(Number.isFinite);
-    if (!Number.isFinite(modified)) { reject("invalid_timestamp"); continue; }
+    const listed = parsedRow.cells.map((value) => parseModified(value, nowMs)).find(Number.isFinite);
+    if (!Number.isFinite(listed)) { reject("invalid_timestamp"); continue; }
+    // A day-set is the files listed on one calendar date in the listing's own time zone.
+    const listedDate = new Date(listed).toISOString().slice(0, 10);
+    const modified = localToUtc(listed, timeZone);
     const url = new URL(encodeURIComponent(parsedRow.filename), base).href;
     rows.push({
-      name: parsedRow.filename, url, sizeBytes: size, modifiedMs: modified,
+      name: parsedRow.filename, url, sizeBytes: size, modifiedMs: modified, listedDate,
       showToken, displayName: displayName.trim(), day, hour, segment,
     });
   }
@@ -143,7 +184,7 @@ export function selectAffiliateShows(rows, source, now = new Date()) {
   for (const row of rows) {
     if (!byShow.has(row.showToken)) byShow.set(row.showToken, new Map());
     const days = byShow.get(row.showToken);
-    const date = new Date(row.modifiedMs).toISOString().slice(0, 10);
+    const date = row.listedDate ?? new Date(row.modifiedMs).toISOString().slice(0, 10);
     if (!days.has(date)) days.set(date, []);
     days.get(date).push(row);
   }

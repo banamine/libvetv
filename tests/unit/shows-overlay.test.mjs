@@ -386,3 +386,75 @@ test("parseDigest caps 20, NFC-normalizes, rejects malformed, empty and non-time
   assert.throws(() => parseDigest({}, NOW.getTime()), /digest_invalid/);
   assert.deepEqual(parseDigest({ stories: [], rss_feeds_articles: [] }, NOW.getTime()), []);
 });
+
+// ---- Real listing captured 2026-10-24 (a <pre> tree, not a table) ----
+const REAL_LISTING = await readFile(new URL("../fixtures/affiliate-listing-real-2026-10-24.html", import.meta.url), "utf8");
+const REAL_NOW = new Date("2026-10-24T15:40:00.000Z");
+
+test("real <pre> tree listing yields all 117 files with no rejects", () => {
+  const parsed = parseAffiliateListing(REAL_LISTING, { shows: SOURCE.shows, fileBase: FILE_BASE, now: REAL_NOW, timeZone: "America/Chicago" });
+  assert.equal(parsed.rows.length, 117);
+  assert.deepEqual(parsed.reasonCounts, {});
+  assert.deepEqual(parsed.unknownShowTokens, []);
+});
+
+test("listing times in America/Chicago convert to the real UTC instant (matches server Last-Modified)", () => {
+  const parsed = parseAffiliateListing(REAL_LISTING, { shows: SOURCE.shows, fileBase: FILE_BASE, now: REAL_NOW, timeZone: "America/Chicago" });
+  const row = (name) => parsed.rows.find((r) => r.name === name);
+  assert.equal(new Date(row("Fri-Alex-Hr1-Seg1.mp4").modifiedMs).toISOString(), "2026-10-23T16:08:00.000Z");
+  assert.equal(new Date(row("Fri-WarRoom-Hr3-Seg3.mp4").modifiedMs).toISOString(), "2026-10-23T23:04:00.000Z");
+  assert.equal(new Date(row("Sun-SundayLive-Hr2-Seg3.mp4").modifiedMs).toISOString(), "2026-10-19T01:04:00.000Z");
+});
+
+test("real listing: newest complete set per show is selected and a set that crosses UTC midnight stays whole", () => {
+  const source = { ...SOURCE, listingTimeZone: "America/Chicago" };
+  const parsed = parseAffiliateListing(REAL_LISTING, { shows: SOURCE.shows, fileBase: FILE_BASE, now: REAL_NOW, timeZone: "America/Chicago" });
+  const { shows } = selectAffiliateShows(parsed.rows, source, REAL_NOW);
+  const by = Object.fromEntries(shows.map((s) => [s.showId, s]));
+  assert.deepEqual(Object.keys(by).sort(), ["Alex", "SundayLive", "WarRoom"]);
+  assert.equal(by.Alex.segments.length, 12);
+  assert.equal(by.Alex.day, "Fri");
+  assert.equal(by.WarRoom.segments.length, 9);
+  assert.equal(by.SundayLive.segments.length, 6); // 18:08-20:04 CT spans 23:08Z-01:04Z
+  assert.equal(by.SundayLive.day, "Sun");
+  assert.equal(by.Alex.fallbackFromDay, undefined);
+  assert.ok(by.Alex.segments.every((seg, i) => seg.seq === i + 1));
+  assert.ok(by.Alex.segments[0].name === "Fri-Alex-Hr1-Seg1.mp4" && by.Alex.segments[11].name === "Fri-Alex-Hr4-Seg3.mp4");
+});
+
+test("without a timeZone the listing is read as UTC (back-compat) and a bad timeZone is rejected", () => {
+  const parsed = parseAffiliateListing(REAL_LISTING, { shows: SOURCE.shows, fileBase: FILE_BASE, now: REAL_NOW });
+  assert.equal(new Date(parsed.rows.find((r) => r.name === "Fri-Alex-Hr1-Seg1.mp4").modifiedMs).toISOString(), "2026-10-23T11:08:00.000Z");
+  assert.throws(() => parseAffiliateListing(REAL_LISTING, { shows: SOURCE.shows, fileBase: FILE_BASE, now: REAL_NOW, timeZone: "Not/AZone" }), /affiliate_timezone_invalid/);
+});
+
+test("pre listing: year-form timestamps (older than six months) parse; junk lines are ignored", () => {
+  const html = `<pre>├── [  400000000 Mar  3  2026]    <a href="x">Mon-Alex-Hr1-Seg1.mp4</a>\nnot a row\n</pre>`;
+  const parsed = parseAffiliateListing(html, { shows: SOURCE.shows, fileBase: FILE_BASE, now: REAL_NOW });
+  assert.equal(parsed.rows.length, 1);
+  assert.equal(new Date(parsed.rows[0].modifiedMs).toISOString(), "2026-03-03T00:00:00.000Z");
+});
+
+test("end-to-end: real committed config + real listing produce valid ok manifests for all three shows", async () => {
+  const config = JSON.parse(await readFile(new URL("../../config/channels.json", import.meta.url), "utf8"));
+  const root = await mkdtemp(join(tmpdir(), "dp-real-"));
+  try {
+    const fixtureDir = join(root, "fx");
+    await mkdir(fixtureDir, { recursive: true });
+    for (const ch of config.channels) {
+      for (const ext of ["m3u", "headers.json"]) {
+        await writeFile(join(fixtureDir, `${ch.guideId}__${ch.id}.${ext}`),
+          await readFile(new URL(`../../tests/fixtures/${ch.guideId}__${ch.id}.${ext}`, import.meta.url)));
+      }
+    }
+    await writeFile(join(fixtureDir, "affiliate-ajn-affiliate-segments.html"), REAL_LISTING);
+    const output = await runGenerator({ config, fixtureDir, baselineDir: root, outDir: root, now: REAL_NOW });
+    const row = output.channels.find((entry) => entry.id === "ajn-affiliate-segments");
+    assert.equal(row.status, "ok");
+    const manifest = JSON.parse(await readFile(join(root, "daily/latest/ajn-affiliate-segments.json"), "utf8"));
+    assert.equal(validManifest(manifest, "ajn-affiliate-segments"), true);
+    assert.deepEqual(manifest.items.map((i) => i.showId).sort(), ["Alex", "SundayLive", "WarRoom"]);
+    assert.equal(manifest.items.reduce((n, i) => n + i.segments.length, 0), 27);
+    assert.ok(manifest.durationBasis === "unknown");
+  } finally { await rm(root, { recursive: true, force: true }); }
+});

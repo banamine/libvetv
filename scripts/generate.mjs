@@ -307,6 +307,7 @@ export async function runGenerator(options) {
     else {
       listing = parseAffiliateListing(fetched.body, {
         shows: sourceConfig.shows, fileBase: sourceConfig.fileBase, now,
+        timeZone: sourceConfig.listingTimeZone,
       });
       for (const [reason, count] of Object.entries(listing.reasonCounts)) {
         reasonCounts[reason] = (reasonCounts[reason] || 0) + count;
