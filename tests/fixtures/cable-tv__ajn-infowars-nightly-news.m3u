@@ -1,0 +1,18 @@
+#EXTM3U
+# Synthetic structure fixture: duration sequence is owner-provided; placeholder URLs/titles are never fetched or published.
+#EXTINF:12614 tvg-id="ajn-infowars-nightly-news",Synthetic fixture item 1
+https://archive.org/download/test-fixture-item-01/test-fixture-item-01.mp4
+#EXTINF:7218 tvg-id="ajn-infowars-nightly-news",Synthetic fixture item 2
+https://archive.org/download/test-fixture-item-02/test-fixture-item-02.mp4
+#EXTINF:12642 tvg-id="ajn-infowars-nightly-news",Synthetic fixture item 3
+https://archive.org/download/test-fixture-item-03/test-fixture-item-03.mp4
+#EXTINF:11132 tvg-id="ajn-infowars-nightly-news",Synthetic fixture item 4
+https://archive.org/download/test-fixture-item-04/test-fixture-item-04.mp4
+#EXTINF:10831 tvg-id="ajn-infowars-nightly-news",Synthetic fixture item 5
+https://archive.org/download/test-fixture-item-05/test-fixture-item-05.mp4
+#EXTINF:7217 tvg-id="ajn-infowars-nightly-news",Synthetic fixture item 6
+https://archive.org/download/test-fixture-item-06/test-fixture-item-06.mp4
+#EXTINF:11144 tvg-id="ajn-infowars-nightly-news",Synthetic fixture item 7
+https://archive.org/download/test-fixture-item-07/test-fixture-item-07.mp4
+#EXTINF:14334 tvg-id="ajn-infowars-nightly-news",Synthetic fixture item 8
+https://archive.org/download/test-fixture-item-08/test-fixture-item-08.mp4
