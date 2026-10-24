@@ -1,5 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
+import { validListingTimeZone } from "./affiliateListing.mjs";
 import { assertPublicDns, readBoundedResponseBody, SourceConfigError } from "./fetchSource.mjs";
 
 const MAX_LISTING_BYTES = 2_000_000;
@@ -19,6 +20,7 @@ export function validateAffiliateSource(source) {
       throw new TypeError("affiliate_source_url_invalid");
     }
   };
+  if (!validListingTimeZone(source.listingTimeZone)) throw new TypeError("affiliate_timezone_invalid");
   checkUrl(source.listUrl, "www.alexjoneslive.com", "/affiliates/mp4-segs/");
   checkUrl(source.fileBase, "affiliates.alexjoneslive.com", "/mp4-segs/");
   for (const [token, display] of Object.entries(source.shows)) {

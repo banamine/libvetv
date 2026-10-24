@@ -10,6 +10,7 @@
       "type": "affiliate-listing",
       "listUrl": "https://www.alexjoneslive.com/affiliates/mp4-segs/",
       "fileBase": "https://affiliates.alexjoneslive.com/mp4-segs/",
+      "listingTimeZone": "America/Chicago",
       "network": "ajn",
       "loop": true,
       "mediaAllowlist": [
