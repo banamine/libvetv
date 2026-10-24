@@ -1,0 +1,42 @@
+{
+  "channels": [
+    {
+      "declaredTotalSeconds": null,
+      "durationBasis": "unknown",
+      "guideId": "movies-classics-vault",
+      "id": "classic-cinema",
+      "itemCount": 0,
+      "label": "Cinema Classics Vault",
+      "manifest": null,
+      "publishedAt": null,
+      "reason": "fixture_missing",
+      "status": "error"
+    },
+    {
+      "declaredTotalSeconds": null,
+      "durationBasis": "unknown",
+      "guideId": "cable-tv",
+      "id": "ajn-infowars-nightly-news",
+      "itemCount": 0,
+      "label": "Infowars Nightly News (archive)",
+      "manifest": null,
+      "publishedAt": null,
+      "reason": "fixture_missing",
+      "status": "error"
+    },
+    {
+      "asOf": "2026-10-23T23:04:00.000Z",
+      "declaredTotalSeconds": null,
+      "durationBasis": "unknown",
+      "guideId": "ajn-affiliate-segments",
+      "id": "ajn-affiliate-segments",
+      "itemCount": 3,
+      "label": "AJN Affiliate Shows",
+      "manifest": "latest/ajn-affiliate-segments.json",
+      "publishedAt": "2026-10-24T16:00:30.069Z",
+      "reason": null,
+      "status": "ok"
+    }
+  ],
+  "schemaVersion": 1
+}
