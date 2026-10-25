@@ -80,3 +80,35 @@ test("no horizontal scroll on a phone viewport", async ({ page }) => {
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth);
   expect(overflow).toBe(false);
 });
+
+test("clicking an allowlisted guide row embeds it in the player area with Open original, Esc closes and returns focus", async ({ page }) => {
+  const external = await routeExternal(page);
+  await page.goto(`${BASE_URL}/`);
+  const row = page.locator("#channel-guide-list a.channel-row").first();
+  const href = await row.getAttribute("href");
+  await row.click();
+  const frame = page.locator("#player-container iframe");
+  await expect(frame).toHaveCount(1);
+  await expect(frame).toHaveAttribute("src", href);
+  await expect(frame).toHaveAttribute("sandbox", "allow-scripts allow-same-origin allow-popups");
+  await expect(frame).toHaveAttribute("title", /.+/);
+  await expect(page.locator(".embed-bar a")).toHaveAttribute("href", href);
+  await expect(page.locator("#status-bar-text")).toContainText("Embedded page - www.liberty-express.org");
+  await page.keyboard.press("Escape");
+  await expect(page.locator("#player-container iframe")).toHaveCount(0);
+  await expect(row).toBeFocused();
+  expect(external.filter((u) => u.startsWith("https://www.liberty-express.org/")).length).toBeGreaterThan(0);
+});
+
+test("modified click on a guide row does not embed; starting a show replaces the embed", async ({ page }) => {
+  await routeExternal(page);
+  await page.goto(`${BASE_URL}/`);
+  const row = page.locator("#channel-guide-list a.channel-row").first();
+  await row.click({ modifiers: ["Shift"] }).catch(() => {});
+  await expect(page.locator("#player-container iframe")).toHaveCount(0);
+  await row.click();
+  await expect(page.locator("#player-container iframe")).toHaveCount(1);
+  await page.locator(".news-tile").first().click();
+  await expect(page.locator("#player-container iframe")).toHaveCount(0);
+  await expect(page.locator("video")).toHaveCount(1);
+});
