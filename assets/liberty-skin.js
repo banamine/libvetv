@@ -66,21 +66,12 @@ function refreshStates() {
 const EMBED_HOSTS = new Set(["liberty-express.org", "www.liberty-express.org"]);
 let embed = null; // { href } while a guide page is shown in the player area
 
-// First-party pages shipped in this repo (pages/*.html next to index.html). They are reviewed code, so they get the
-// same-origin sandbox the nested video player needs; nothing else on banamine.github.io qualifies.
-const LOCAL_PAGE = /^pages\/[a-z0-9-]+\.html$/;
-
-function embedKind(href) {
+function canEmbed(href) {
   try {
     const u = new URL(href, document.baseURI);
-    if (u.protocol === "https:" && EMBED_HOSTS.has(u.hostname)) return "remote";
-    const base = new URL(".", document.baseURI);
-    if (u.origin === base.origin && u.pathname.startsWith(base.pathname) && LOCAL_PAGE.test(u.pathname.slice(base.pathname.length))) return "local";
-  } catch { /* fall through */ }
-  return null;
+    return u.protocol === "https:" && EMBED_HOSTS.has(u.hostname);
+  } catch { return false; }
 }
-
-function canEmbed(href) { return embedKind(href) !== null; }
 
 function findGuideRow(href) {
   for (const a of document.querySelectorAll("#channel-guide-list a.channel-row")) if (a.href === href) return a;
@@ -106,14 +97,12 @@ function openEmbed(row, title) {
   bar.append(label, original, close);
   const frame = document.createElement("iframe");
   frame.title = title;
-  frame.setAttribute("sandbox", embedKind(row.href) === "local" ? "allow-scripts allow-same-origin allow-popups allow-presentation" : "allow-scripts allow-same-origin allow-popups");
+  frame.setAttribute("sandbox", "allow-scripts allow-same-origin allow-popups");
   frame.referrerPolicy = "no-referrer";
-  frame.setAttribute("allow", embedKind(row.href) === "local" ? "autoplay; fullscreen; picture-in-picture" : "fullscreen");
   frame.src = row.href;
   panel.append(bar, frame);
   container.replaceChildren(panel);
-  container.parentElement.classList.add("is-embedding");
-  setStatus(0, `Embedded page - ${new URL(row.href).hostname}${embedKind(row.href) === "local" ? " (local)" : ""}`);
+  setStatus(0, `Embedded page - ${new URL(row.href).hostname}`);
   close.focus();
 }
 
@@ -131,7 +120,6 @@ function stopPlayback() {
   state.token += 1;
   embed = null;
   const container = $("player-container");
-  container.parentElement.classList.remove("is-embedding");
   const video = container.querySelector("video");
   if (video) {
     video.pause();
@@ -222,7 +210,7 @@ function renderGuide() {
   for (const page of rows) {
     const li = document.createElement("li");
     const a = el("a", "channel-row");
-    a.href = new URL(page.url, document.baseURI).href;
+    a.href = page.url;
     a.target = "_blank";
     a.rel = "noopener noreferrer";
     const thumb = el("div", "channel-thumb", "PAGE");
@@ -270,7 +258,7 @@ function validPages(data) {
   if (!data || data.schemaVersion !== 1 || !Array.isArray(data.pages)) return false;
   return data.pages.every((p) => p && typeof p.title === "string" && p.title.trim() &&
     CATEGORIES.includes(p.cat) && p.cat !== "All" && typeof p.url === "string" &&
-    (LOCAL_PAGE.test(p.url) || (() => { try { const u = new URL(p.url); return u.origin === PAGE_ORIGIN && (u.pathname === "/" || u.pathname.endsWith(".html")); } catch { return false; } })()));
+    (() => { try { const u = new URL(p.url); return u.origin === PAGE_ORIGIN && (u.pathname === "/" || u.pathname.endsWith(".html")); } catch { return false; } })());
 }
 
 async function fetchJson(url) {

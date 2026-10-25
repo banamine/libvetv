@@ -26,7 +26,7 @@ test("skin loads real data, plays nothing until clicked", async ({ page }) => {
   await page.goto(`${BASE_URL}/`);
   await expect(page.locator("h1")).toHaveText("Liberty Express");
   await expect(page.locator(".news-tile")).toHaveCount(3);
-  await expect(page.locator(".cat-btn").first()).toContainText("336");
+  await expect(page.locator(".cat-btn").first()).toContainText("335");
   await expect(page.locator("video")).toHaveCount(0);
   expect(external).toEqual([]);          // nothing external requested before a click
   expect(errors).toEqual([]);
@@ -111,35 +111,4 @@ test("modified click on a guide row does not embed; starting a show replaces the
   await page.locator(".news-tile").first().click();
   await expect(page.locator("#player-container iframe")).toHaveCount(0);
   await expect(page.locator("video")).toHaveCount(1);
-});
-
-test("Anabia's Films Player is listed under Movies and runs embedded; API titles are rendered as text", async ({ page }) => {
-  const dm = [];
-  await page.route("https://www.dailymotion.com/**", async (route) => {
-    dm.push(route.request().url());
-    await route.fulfill({ status: 200, contentType: "text/html", body: "<title>player stub</title>" });
-  });
-  await page.route("https://api.dailymotion.com/**", async (route) => {
-    await route.fulfill({ status: 200, contentType: "application/json", headers: { "access-control-allow-origin": "*" },
-      body: JSON.stringify({ list: [{ id: "x1", title: "<img src=x onerror=window.__pwned=1> (2026) | Full Movie", duration: 3600, created_time: 1 }], has_more: false }) });
-  });
-  await routeExternal(page);
-  await page.goto(`${BASE_URL}/`);
-  await page.locator('.cat-btn[data-cat="Movies"]').click();
-  const row = page.locator("#channel-guide-list a.channel-row", { hasText: "Anabia's Films Player" });
-  await expect(row).toHaveCount(1);
-  await row.click();
-  const outer = page.locator("#player-container iframe");
-  await expect(outer).toHaveAttribute("src", /\/pages\/anabias-films-player\.html$/);
-  await expect(outer).toHaveAttribute("allow", /autoplay/);
-  await expect(page.locator("#status-bar-text")).toContainText("Embedded page");
-  const inner = page.frameLocator("#player-container iframe");
-  await expect(inner.locator(".card")).toHaveCount(19);
-  await inner.locator(".card").first().click();
-  await expect(inner.locator("#player iframe")).toHaveAttribute("src", /dailymotion\.com\/embed\/video\/xa5bhh0\?autoplay=1/);
-  await inner.locator("#refresh").click();
-  await expect(inner.locator(".card")).toHaveCount(1);
-  await expect(inner.locator(".card b")).toContainText("<img src=x onerror");
-  expect(await page.frames().find((f) => /anabias/.test(f.url())).evaluate(() => window.__pwned)).toBeUndefined();
-  await page.screenshot({ path: "test-results/anabia-embed.png" });
 });
