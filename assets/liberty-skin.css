@@ -556,3 +556,6 @@
 .embed-close{background:none;border:1px solid #d4a017;color:#f5d76e;border-radius:4px;padding:2px 8px;cursor:pointer}
 .embed-close:focus-visible,.embed-bar a:focus-visible{outline:2px solid #d4a017;outline-offset:2px}
 .embed-panel iframe{flex:1;border:0;background:#fff;width:100%}
+
+/* embedded pages are apps, not 16:9 video: give them a tall stage */
+.player-wrapper.is-embedding{padding-top:0;height:min(80vh,820px);min-height:420px}
