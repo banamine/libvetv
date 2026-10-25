@@ -11,7 +11,7 @@ import {
 } from "./helpers.mjs";
 
 async function gotoBranch(page) {
-  await page.goto(`${BASE_URL}/`);
+  await page.goto(`${BASE_URL}/classic.html`);
   await expect(page.locator("#dp-open")).toBeAttached();
   await waitForOldPagePlaying(page);
 }
