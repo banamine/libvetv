@@ -548,3 +548,11 @@
         .footer-nav a { color: var(--text-cream); font-size: 0.8125rem; font-weight: 600; padding: 0.25rem 0.5rem; text-decoration: none; }
         .footer-nav a:hover { color: var(--gold-accent); text-decoration: underline; }
         .footer-nav a:focus-visible { outline: 2px solid var(--gold-accent); outline-offset: 2px; }
+
+.embed-panel{display:flex;flex-direction:column;width:100%;height:100%;background:#0b1f3a}
+.embed-bar{display:flex;gap:12px;align-items:center;padding:6px 10px;color:#f5d76e;font-size:.85rem}
+.embed-title{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.embed-bar a{margin-left:auto;color:#f5d76e;white-space:nowrap}
+.embed-close{background:none;border:1px solid #d4a017;color:#f5d76e;border-radius:4px;padding:2px 8px;cursor:pointer}
+.embed-close:focus-visible,.embed-bar a:focus-visible{outline:2px solid #d4a017;outline-offset:2px}
+.embed-panel iframe{flex:1;border:0;background:#fff;width:100%}

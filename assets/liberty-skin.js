@@ -59,10 +59,66 @@ function refreshStates() {
   }
 }
 
-/* ---------- playback (shows only; pages open in a new tab) ---------- */
+/* ---------- playback (shows) and click-to-embed (allowlisted guide pages) ---------- */
+
+// Only the owner's own pages are framed. banamine.github.io is deliberately excluded: it is the
+// same origin as this page, and a same-origin frame with allow-scripts + allow-same-origin is unsandboxed.
+const EMBED_HOSTS = new Set(["liberty-express.org", "www.liberty-express.org"]);
+let embed = null; // { href } while a guide page is shown in the player area
+
+function canEmbed(href) {
+  try {
+    const u = new URL(href, document.baseURI);
+    return u.protocol === "https:" && EMBED_HOSTS.has(u.hostname);
+  } catch { return false; }
+}
+
+function findGuideRow(href) {
+  for (const a of document.querySelectorAll("#channel-guide-list a.channel-row")) if (a.href === href) return a;
+  return null;
+}
+
+function openEmbed(row, title) {
+  stopPlayback();                       // one active thing at a time; also clears any playing show
+  state.active = null;
+  for (const [id, name] of rowState) if (name !== "unavailable") rowState.set(id, "idle");
+  refreshStates();
+  embed = { href: row.href };
+  const container = $("player-container");
+  const panel = el("section", "embed-panel");
+  panel.setAttribute("aria-label", title);
+  const bar = el("div", "embed-bar");
+  const label = el("span", "embed-title", title);
+  const original = el("a", "", "Open original \u2197");
+  original.href = row.href; original.target = "_blank"; original.rel = "noopener noreferrer";
+  const close = el("button", "embed-close", "\u2715");
+  close.type = "button"; close.setAttribute("aria-label", "Close embedded page");
+  close.addEventListener("click", closeEmbed);
+  bar.append(label, original, close);
+  const frame = document.createElement("iframe");
+  frame.title = title;
+  frame.setAttribute("sandbox", "allow-scripts allow-same-origin allow-popups");
+  frame.referrerPolicy = "no-referrer";
+  frame.src = row.href;
+  panel.append(bar, frame);
+  container.replaceChildren(panel);
+  setStatus(0, `Embedded page - ${new URL(row.href).hostname}`);
+  close.focus();
+}
+
+function closeEmbed() {
+  if (!embed) return;
+  const href = embed.href;
+  stopPlayback();
+  state.active = null;
+  refreshStates();
+  setStatus(0, "Ready");
+  findGuideRow(href)?.focus();
+}
 
 function stopPlayback() {
   state.token += 1;
+  embed = null;
   const container = $("player-container");
   const video = container.querySelector("video");
   if (video) {
@@ -159,13 +215,21 @@ function renderGuide() {
     a.rel = "noopener noreferrer";
     const thumb = el("div", "channel-thumb", "PAGE");
     const info = el("div", "channel-info");
-    info.append(el("div", "channel-title", page.title), el("div", "channel-meta", `${page.cat} • opens in a new tab`));
+    info.append(el("div", "channel-title", page.title), el("div", "channel-meta", canEmbed(page.url) ? `${page.cat} \u2022 shown here \u2022 Ctrl-click for a new tab` : `${page.cat} \u2022 opens in a new tab`));
     a.append(thumb, info);
     a.style.textDecoration = "none";
     li.append(a);
     list.append(li);
   }
 }
+
+$("channel-guide-list").addEventListener("click", (event) => {
+  const row = event.target.closest("a.channel-row");
+  if (!row || !canEmbed(row.href) || event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
+  event.preventDefault();
+  openEmbed(row, row.querySelector(".channel-title")?.textContent || row.href);
+});
+document.addEventListener("keydown", (event) => { if (event.key === "Escape") closeEmbed(); });
 
 /* ---------- news wall (AJN shows from the daily playlist) ---------- */
 
