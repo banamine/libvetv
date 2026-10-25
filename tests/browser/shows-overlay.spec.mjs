@@ -57,7 +57,7 @@ async function setup(page, options = {}) {
       "/daily/latest/demo-show.json": options.manifestOverrides?.["/daily/latest/demo-show.json"] || manifest,
     },
   });
-  await page.goto(BASE_URL);
+  await page.goto(`${BASE_URL}/classic.html`);
   await waitForOldPagePlaying(page);
   expect(stats.digestPaths).toEqual([]);
   await openPlaylist(page, `DEMO — Show Channel — ${options.status || "ok"}`);
@@ -387,7 +387,7 @@ for (const width of [360, 1280]) {
       ] },
       manifestOverrides: { "/daily/latest/demo-show.json": manifest },
     });
-    await page.goto(BASE_URL);
+    await page.goto(`${BASE_URL}/classic.html`);
     await waitForOldPagePlaying(page);
     await shot(page, info, `step8-${width}-closed.png`, "page");
 

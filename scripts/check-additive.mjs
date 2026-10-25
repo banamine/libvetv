@@ -2,8 +2,9 @@
 
 import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
-import { readFile } from "node:fs/promises";
-import { dirname, resolve } from "node:path";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -49,6 +50,23 @@ function parseArgs(argv) {
   return argv[1];
 }
 
+async function numstatAgainst(baseBytes) {
+  const dir = await mkdtemp(join(tmpdir(), "additive-"));
+  try {
+    const basePath = join(dir, "base.html");
+    await writeFile(basePath, baseBytes);
+    try {
+      return execFileSync("git", ["diff", "--no-index", "--numstat", "--", basePath, "classic.html"],
+        { cwd: REPO_ROOT, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
+    } catch (error) {
+      if (error?.status === 1 && typeof error.stdout === "string") return error.stdout; // differences found
+      throw error;
+    }
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+}
+
 function git(args) {
   return execFileSync("git", args, { cwd: REPO_ROOT, encoding: null, stdio: ["ignore", "pipe", "pipe"] });
 }
@@ -60,15 +78,23 @@ async function main() {
   } catch {
     throw new Error(`base_ref_unavailable:${baseRef}`);
   }
-  const numstat = git(["diff", "--numstat", baseRef, "--", "index.html"]).toString("utf8");
-  const baseBytes = git(["show", `${baseRef}:index.html`]);
-  const currentBytes = await readFile(resolve(REPO_ROOT, "index.html"));
+  // The preserved legacy page now lives at classic.html. Before that move the baseline
+  // is index.html, so fall back to it when the base ref has no classic.html yet.
+  let baseFile = "classic.html";
+  try {
+    git(["cat-file", "-e", `${baseRef}:classic.html`]);
+  } catch {
+    baseFile = "index.html";
+  }
+  const baseBytes = git(["show", `${baseRef}:${baseFile}`]);
+  const currentBytes = await readFile(resolve(REPO_ROOT, "classic.html"));
+  const numstat = await numstatAgainst(baseBytes);
   const result = checkAdditive({ baseBytes, currentBytes, numstat });
   const displayedNumstat = numstat.trim()
     ? numstat.trim().split("\t").join(" | ")
     : "(no change)";
-  console.log(`git diff --numstat ${baseRef} -- index.html: ${displayedNumstat}`);
-  console.log(`PASS: zero deleted lines; stripped ${result.markerBlocks} marker blocks match ${baseRef}:index.html SHA-256 ${result.baseHash}`);
+  console.log(`classic.html vs ${baseRef} numstat: ${displayedNumstat}`);
+  console.log(`PASS: zero deleted lines; stripped ${result.markerBlocks} marker blocks match the ${baseRef} legacy page SHA-256 ${result.baseHash}`);
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

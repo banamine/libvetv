@@ -1,8 +1,9 @@
 #!/usr/bin/env node
 
 import { execFileSync } from "node:child_process";
-import { readFile, readdir } from "node:fs/promises";
-import { dirname, resolve } from "node:path";
+import { mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { isSafeManifestPath, resolveManifestUrl } from "../assets/manifest-path.js";
 import { checkLockfile } from "./check-lockfile.mjs";
@@ -46,6 +47,29 @@ export function checkAddedResourceOrigins(diffText, baseUrl = DUMMY_BASE) {
     }
   }
   return true;
+}
+
+// Added lines to check: the legacy page (classic.html) diffed against its baseline, plus every
+// line of the new skin page (index.html), which is wholly new markup.
+async function legacyAndSkinDiff(baseRef, repoRoot) {
+  let baseFile = "classic.html";
+  try { git(["cat-file", "-e", `${baseRef}:classic.html`], repoRoot); } catch { baseFile = "index.html"; }
+  const dir = await mkdtemp(join(tmpdir(), "verify-site-"));
+  let legacy = "";
+  try {
+    const basePath = join(dir, "base.html");
+    await writeFile(basePath, git(["show", `${baseRef}:${baseFile}`], repoRoot));
+    try {
+      legacy = execFileSync("git", ["diff", "--no-index", "--unified=0", "--", basePath, "classic.html"],
+        { cwd: repoRoot, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], maxBuffer: 64 * 1024 * 1024 });
+    } catch (error) {
+      if (error?.status === 1 && typeof error.stdout === "string") legacy = error.stdout; else throw error;
+    }
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+  const skin = (await readFile(resolve(repoRoot, "index.html"), "utf8")).split(/\r?\n/).map((line) => `+${line}`).join("\n");
+  return `${legacy}\n${skin}`;
 }
 
 export async function assertAssetsDoNotImportScripts(root) {
@@ -102,7 +126,7 @@ export async function verifySite({
     } catch {
       throw new Error(`base_ref_unavailable:${baseRef}`);
     }
-    diff = git(["diff", "--unified=0", baseRef, "--", "index.html"], repoRoot).toString("utf8");
+    diff = await legacyAndSkinDiff(baseRef, repoRoot);
   }
   checkAddedResourceOrigins(diff, DUMMY_BASE);
   await assertAssetsDoNotImportScripts(repoRoot);

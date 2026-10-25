@@ -15,11 +15,14 @@ const MEDIA = {
   long: await readFile(resolve(MEDIA_ROOT, "long.mp4")),
 };
 
-export const BASELINE_HTML = execFileSync(
-  "git",
-  ["show", "origin/main:index.html"],
-  { cwd: ROOT, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] },
-);
+function showBaseline(path) {
+  return execFileSync("git", ["show", `origin/main:${path}`], { cwd: ROOT, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
+}
+
+// The preserved legacy page is classic.html once this layout is on main; before that it was index.html.
+export const BASELINE_HTML = (() => {
+  try { return showBaseline("classic.html"); } catch { return showBaseline("index.html"); }
+})();
 
 export async function readIndexFixture() {
   return JSON.parse(await readFile(resolve(DAILY_ROOT, "latest/index.json"), "utf8"));
@@ -93,7 +96,7 @@ export async function installLocalNetwork(page, {
     if (requestUrl.origin === BASE_URL) {
       stats.localPaths.push(requestUrl.pathname);
       const localPath = requestUrl.pathname.replace(/^\/libvetv(?=\/|$)/, "") || "/";
-      if (localPath === "/" || localPath === "/index.html") {
+      if (localPath === "/" || localPath === "/index.html" || localPath === "/classic.html") {
         const response = await route.fetch();
         let body = await response.text();
         if (!replaceLegacy) {
